@@ -205,6 +205,54 @@
     <div id="notice_div" class="alert alert-primary" role="alert" style="display: none"></div>
     <div id="error_div" class="alert alert-danger" role="alert" style="display: none"></div>
   </div>
+  <div class="row justify-content-center mb-4">
+    <div class="col-12 col-md-10 col-lg-8">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h2 class="card-title text-center mb-4">오늘의 묵주 기도너</h2>
+          <p class="text-center text-secondary mb-2">오늘 함께 바칠 신비를 선택해 보세요.</p>
+          <p class="text-center text-muted small mb-4">월·토 환희 | 화·금 고통 | 수·일 영광 | 목요일 빛의 신비</p>
+          <div class="row gy-3">
+            <div class="col-12 col-sm-6">
+              <div class="form-check border rounded p-3 h-100">
+                <input class="form-check-input" type="checkbox" value="환의의 신비" id="plannerJoyful">
+                <label class="form-check-label fw-semibold" for="plannerJoyful">
+                  환의의 신비
+                </label>
+              </div>
+            </div>
+            <div class="col-12 col-sm-6">
+              <div class="form-check border rounded p-3 h-100">
+                <input class="form-check-input" type="checkbox" value="고통의 신비" id="plannerSorrowful">
+                <label class="form-check-label fw-semibold" for="plannerSorrowful">
+                  고통의 신비
+                </label>
+              </div>
+            </div>
+            <div class="col-12 col-sm-6">
+              <div class="form-check border rounded p-3 h-100">
+                <input class="form-check-input" type="checkbox" value="영광의 신비" id="plannerGlorious">
+                <label class="form-check-label fw-semibold" for="plannerGlorious">
+                  영광의 신비
+                </label>
+              </div>
+            </div>
+            <div class="col-12 col-sm-6">
+              <div class="form-check border rounded p-3 h-100">
+                <input class="form-check-input" type="checkbox" value="빛의 신비" id="plannerLuminous">
+                <label class="form-check-label fw-semibold" for="plannerLuminous">
+                  빛의 신비
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="d-grid mt-4">
+            <button type="button" class="btn btn-primary btn-lg py-3" id="plannerStartButton">시작</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
   <div id="mdrow" class="row">
   </div>
 </main>
@@ -232,8 +280,46 @@ function never_see_startup() {
 function load_record() {
 }
 
+function select_default_mystery_for_today() {
+  const checkboxes = [
+    "#plannerJoyful",
+    "#plannerSorrowful",
+    "#plannerGlorious",
+    "#plannerLuminous"
+  ];
+
+  checkboxes.forEach((selector) => {
+    const element = $(selector);
+    if (element.length) {
+      element.prop("checked", false);
+    }
+  });
+
+  const day = new Date().getDay();
+  switch (day) {
+    case 1: // Monday
+    case 6: // Saturday
+      $("#plannerJoyful").prop("checked", true);
+      break;
+    case 2: // Tuesday
+    case 5: // Friday
+      $("#plannerSorrowful").prop("checked", true);
+      break;
+    case 3: // Wednesday
+    case 0: // Sunday
+      $("#plannerGlorious").prop("checked", true);
+      break;
+    case 4: // Thursday
+      $("#plannerLuminous").prop("checked", true);
+      break;
+    default:
+      break;
+  }
+}
+
 $(document).ready(function() {
   show_menu_title(false);
+  select_default_mystery_for_today();
 
   if(window.location.hash == "") {
     if(localStorage.getItem(startup_dialog_version) != "no") {
