@@ -209,7 +209,7 @@
     <div class="col-12 col-md-10 col-lg-8">
       <div class="card shadow-sm">
         <div class="card-body">
-          <h2 class="card-title text-center mb-4">오늘의 묵주 기도너</h2>
+          <h2 class="card-title text-center mb-4">오늘의 묵주 기도</h2>
           <p class="text-center text-secondary mb-2">오늘 함께 바칠 신비를 선택해 보세요.</p>
           <p class="text-center text-muted small mb-4">월·토 환희 | 화·금 고통 | 수·일 영광 | 목요일 빛의 신비</p>
           <div class="row gy-3">
@@ -279,6 +279,33 @@
                   <option value="4">4단</option>
                   <option value="5" selected>5단</option>
                 </select>
+              </div>
+            </div>
+          </div>
+          <div class="mt-4">
+            <div class="border rounded">
+              <button class="w-100 bg-transparent border-0 px-3 py-3 d-flex align-items-center justify-content-between" type="button" data-bs-toggle="collapse" data-bs-target="#plannerOptions" aria-expanded="false" aria-controls="plannerOptions">
+                <span class="fw-semibold">옵션</span>
+                <i class="bi bi-chevron-down" aria-hidden="true" id="plannerOptionsToggleIcon"></i>
+              </button>
+              <div class="collapse" id="plannerOptions">
+                <div class="border-top px-3 pb-3 pt-3">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="plannerOptionTts">
+                    <label class="form-check-label" for="plannerOptionTts">TTS로 읽어 주기</label>
+                  </div>
+                  <div class="form-check form-switch mt-2">
+                    <input class="form-check-input" type="checkbox" role="switch" id="plannerOptionAutoProgress">
+                    <label class="form-check-label" for="plannerOptionAutoProgress">자동으로 진행 하기</label>
+                  </div>
+                  <div class="form-check form-switch mt-2">
+                    <input class="form-check-input" type="checkbox" role="switch" id="plannerOptionVoiceAuto" disabled>
+                    <label class="form-check-label d-flex align-items-center" for="plannerOptionVoiceAuto">
+                      음성 인식으로 자동 진행 하기
+                      <span class="badge bg-secondary ms-2">실험 기능</span>
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -380,6 +407,33 @@ function update_mystery_count_states() {
   });
 }
 
+function update_voice_auto_option() {
+  const autoProgressCheckbox = $("#plannerOptionAutoProgress");
+  const voiceAutoCheckbox = $("#plannerOptionVoiceAuto");
+  if (!autoProgressCheckbox.length || !voiceAutoCheckbox.length) {
+    return;
+  }
+  const enableVoiceAuto = autoProgressCheckbox.is(":checked");
+  voiceAutoCheckbox.prop("disabled", !enableVoiceAuto);
+  if (!enableVoiceAuto) {
+    voiceAutoCheckbox.prop("checked", false);
+  }
+}
+
+function init_option_collapse_icon() {
+  const optionsCollapse = $("#plannerOptions");
+  const toggleIcon = $("#plannerOptionsToggleIcon");
+  if (!optionsCollapse.length || !toggleIcon.length) {
+    return;
+  }
+  optionsCollapse.on("show.bs.collapse", function() {
+    toggleIcon.removeClass("bi-chevron-down").addClass("bi-chevron-up");
+  });
+  optionsCollapse.on("hide.bs.collapse", function() {
+    toggleIcon.removeClass("bi-chevron-up").addClass("bi-chevron-down");
+  });
+}
+
 $(document).ready(function() {
   show_menu_title(false);
   select_default_mystery_for_today();
@@ -390,6 +444,9 @@ $(document).ready(function() {
   });
   update_planner_start_button();
   update_mystery_count_states();
+  $("#plannerOptionAutoProgress").on("change", update_voice_auto_option);
+  update_voice_auto_option();
+  init_option_collapse_icon();
 
   if(window.location.hash == "") {
     if(localStorage.getItem(startup_dialog_version) != "no") {
