@@ -16,9 +16,76 @@
 
     <link rel="icon" href="favicon.ico">
 
+    <style>
+      .prayer-layout {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 160px);
+        min-height: calc(100vh - 160px);
+        gap: 1rem;
+      }
+      .prayer-pane-top {
+        flex: 0 0 calc(60% - 0.5rem);
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 0.75rem;
+      }
+      .prayer-pane-bottom {
+        flex: 0 0 calc(40% - 0.5rem);
+        background-color: #ffffff;
+        border: 1px solid #dee2e6;
+        border-radius: 0.75rem;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .prayer-lyric-area {
+        flex: 1 1 auto;
+        overflow-y: auto;
+      }
+      .prayer-options-overlay {
+        max-width: 320px;
+      }
+      .prayer-options-overlay #plannerOptionsWrapper {
+        background-color: rgba(255, 255, 255, 0.95);
+        border-radius: 0.75rem;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        border: 1px solid #dee2e6;
+      }
+      .prayer-options-overlay #plannerOptions {
+        border-top: none;
+      }
+      body.prayer-mode {
+        overflow: hidden;
+      }
+      body.prayer-mode .prayer-layout {
+        height: 100vh;
+        min-height: 100vh;
+      }
+      body.prayer-mode main.container-fluid {
+        padding-left: 0;
+        padding-right: 0;
+      }
+      body.prayer-mode #mdrow {
+        margin: 0;
+      }
+      @media (max-width: 767.98px) {
+        .prayer-layout {
+          height: auto;
+          min-height: auto;
+        }
+        .prayer-pane-top,
+        .prayer-pane-bottom {
+          flex: unset;
+        }
+        .prayer-pane-top {
+          min-height: 240px;
+        }
+      }
+    </style>
   </head>
   <body>
-<nav class="navbar navbar-expand-md navbar-dark bg-dark mb-4">
+<nav class="navbar navbar-expand-md navbar-dark bg-dark mb-4" id="mainNavbar">
   <div class="container-fluid">
     <a class="navbar-brand" href="" id="menu_title">묵주 기도 도우미</a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
@@ -84,234 +151,145 @@
   </div>
 </div>
 
-<!-- Share Modal -->
-<div class="modal fade" id="shareModal" tabindex="-1" aria-labelledby="shareModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h1 class="modal-title fs-5" id="shareModalLabel">다른 슬라이드덱 봉사자와 편집 내용 공유하기</h1>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
-      </div>
-      <div class="modal-body">
-        <p>
-          <small>편집 중인 마크다운 소스를 직접 파일에 저장 또는 Email로 공유 하거나 다음의 주소를 보내어 다른 사람과 편집 내용을 쉽게 공유할 수 있습니다.</small>
-        </p>
-        <p>
-          <small>어떻게 작동 하나요?</small> <a id="readMore2" data-bs-toggle="collapse" href="#moreText2" aria-expanded="false" aria-controls="moreText2"><small>자세히</small></a></small>
-          <span id="moreText2" class="collapse"><br/><small>편집기에 입력된 Markdown 텍스트는 gzip 으로 압축 된 뒤 Base64로 인코딩 되어 현재 웹페이지의 URL에 해시(#) 식별자 형식으로 연결됩니다. 이 긴 URL은 E-mail이나 메신저 등을 통해 공유되며, 전달 받는 측에서 역순으로 해시(#) 식별자 정보를 디코딩 및 압축 해제되어 편집기에 입력되어 작업을 이어갈 수 있습니다.</small><br/>
-          <small>URL이 다소 길순 있지만 뭐 괜찮습니다.</small></span>
-        </p>
-        <div class="card">
-          <h5 class="card-header">URL</h5>
-          <div class="card-body" id="shareURL">
-          </div>
-        </div>
-
-
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-primary" data-bs-dismiss="modal" onclick="clipboard.copy($('#shareURL').text().trim());">복사</button>
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Settings Modal -->
-<div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h1 class="modal-title fs-5" id="settingsModalLabel">Markdown 에디터 설정</h1>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
-      </div>
-      <div class="modal-body">
-        <input class="form-check-input" type="checkbox" value="" id="vim_mode" onclick="set_keybinding(this.checked)">
-        <label class="form-check-label" for="vim_mode" data-bs-toggle="tooltip" data-bs-placement="top" title="Vim 키 바인딩으로 편집합니다">
-          Vim 키바인딩&nbsp;&nbsp;
-        </label>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Month Modal -->
-<div class="modal fade" id="monthModal" tabindex="-1" aria-labelledby="monthModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h1 class="modal-title fs-5" id="monthModalLabel">불러오기</h1>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
-      </div>
-      <div class="modal-body">
-        <div class="list-group" id="month_list">
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Hymn Modal -->
-<div class="modal fade" id="hymnModal" tabindex="-1" aria-labelledby="hymnModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h1 class="modal-title fs-5" id="hymnModalLabel">불러오기</h1>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
-      </div>
-      <div class="modal-body">
-        <div class="list-group" id="hymn_list">
-        </div>
-      </div>
-      <div class="modal-footer">
-        <div id="hymn_preview" class="alert alert-secondary" style="width: 100%" role="alert"></div>
-        <button type="button" class="btn btn-primary" data-bs-dismiss="modal" id="hymn_add_button" style="display: none" onclick="add_hymn()">추가</button>
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Prayer Modal -->
-<div class="modal fade" id="prayerModal" tabindex="-1" aria-labelledby="prayerModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h1 class="modal-title fs-5" id="prayerModalLabel">기도문 목록</h1>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
-      </div>
-      <div class="modal-body">
-        <div class="list-group" id="prayer_list">
-        </div>
-      </div>
-      <div class="modal-footer">
-        <div id="prayer_preview" class="alert alert-secondary" style="width: 100%" role="alert"></div>
-        <button type="button" class="btn btn-primary" data-bs-dismiss="modal" id="prayer_add_button" style="display: none" onclick="add_prayer()">추가</button>
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-
 <main class="container-fluid">
   <div class="row ms-1 me-1">
     <div id="notice_div" class="alert alert-primary" role="alert" style="display: none"></div>
     <div id="error_div" class="alert alert-danger" role="alert" style="display: none"></div>
   </div>
-  <div class="row justify-content-center mb-4">
-    <div class="col-12 col-md-10 col-lg-8">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <h2 class="card-title text-center mb-4">오늘의 묵주 기도</h2>
-          <p class="text-center text-secondary mb-2">오늘 함께 바칠 신비를 선택해 보세요.</p>
-          <p class="text-center text-muted small mb-4">월·토 환희 | 화·금 고통 | 수·일 영광 | 목요일 빛의 신비</p>
-          <div class="row gy-3">
-            <div class="col-12 col-sm-6">
-              <div class="form-check border rounded p-3 h-100 d-flex align-items-center justify-content-between">
-                <div class="d-flex align-items-center">
-                  <input class="form-check-input me-2" type="checkbox" value="환의의 신비" id="plannerJoyful">
-                  <label class="form-check-label fw-semibold mb-0" for="plannerJoyful">
-                    환의의 신비
-                  </label>
-                </div>
-                <select class="form-select form-select-sm w-auto text-center" id="plannerJoyfulCount" aria-label="환의의 신비 단수 선택" disabled>
-                  <option value="1">1단</option>
-                  <option value="2">2단</option>
-                  <option value="3">3단</option>
-                  <option value="4">4단</option>
-                  <option value="5" selected>5단</option>
-                </select>
-              </div>
-            </div>
-            <div class="col-12 col-sm-6">
-              <div class="form-check border rounded p-3 h-100 d-flex align-items-center justify-content-between">
-                <div class="d-flex align-items-center">
-                  <input class="form-check-input me-2" type="checkbox" value="고통의 신비" id="plannerSorrowful">
-                  <label class="form-check-label fw-semibold mb-0" for="plannerSorrowful">
-                    고통의 신비
-                  </label>
-                </div>
-                <select class="form-select form-select-sm w-auto text-center" id="plannerSorrowfulCount" aria-label="고통의 신비 단수 선택" disabled>
-                  <option value="1">1단</option>
-                  <option value="2">2단</option>
-                  <option value="3">3단</option>
-                  <option value="4">4단</option>
-                  <option value="5" selected>5단</option>
-                </select>
-              </div>
-            </div>
-            <div class="col-12 col-sm-6">
-              <div class="form-check border rounded p-3 h-100 d-flex align-items-center justify-content-between">
-                <div class="d-flex align-items-center">
-                  <input class="form-check-input me-2" type="checkbox" value="영광의 신비" id="plannerGlorious">
-                  <label class="form-check-label fw-semibold mb-0" for="plannerGlorious">
-                    영광의 신비
-                  </label>
-                </div>
-                <select class="form-select form-select-sm w-auto text-center" id="plannerGloriousCount" aria-label="영광의 신비 단수 선택" disabled>
-                  <option value="1">1단</option>
-                  <option value="2">2단</option>
-                  <option value="3">3단</option>
-                  <option value="4">4단</option>
-                  <option value="5" selected>5단</option>
-                </select>
-              </div>
-            </div>
-            <div class="col-12 col-sm-6">
-              <div class="form-check border rounded p-3 h-100 d-flex align-items-center justify-content-between">
-                <div class="d-flex align-items-center">
-                  <input class="form-check-input me-2" type="checkbox" value="빛의 신비" id="plannerLuminous">
-                  <label class="form-check-label fw-semibold mb-0" for="plannerLuminous">
-                    빛의 신비
-                  </label>
-                </div>
-                <select class="form-select form-select-sm w-auto text-center" id="plannerLuminousCount" aria-label="빛의 신비 단수 선택" disabled>
-                  <option value="1">1단</option>
-                  <option value="2">2단</option>
-                  <option value="3">3단</option>
-                  <option value="4">4단</option>
-                  <option value="5" selected>5단</option>
-                </select>
-              </div>
-            </div>
-          </div>
-          <div class="mt-4">
-            <div class="border rounded">
-              <button class="w-100 bg-transparent border-0 px-3 py-3 d-flex align-items-center justify-content-between" type="button" data-bs-toggle="collapse" data-bs-target="#plannerOptions" aria-expanded="false" aria-controls="plannerOptions">
-                <span class="fw-semibold">옵션</span>
-                <i class="bi bi-chevron-down" aria-hidden="true" id="plannerOptionsToggleIcon"></i>
-              </button>
-              <div class="collapse" id="plannerOptions">
-                <div class="border-top px-3 pb-3 pt-3">
-                  <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" role="switch" id="plannerOptionTts">
-                    <label class="form-check-label" for="plannerOptionTts">TTS로 읽어 주기</label>
-                  </div>
-                  <div class="form-check form-switch mt-2">
-                    <input class="form-check-input" type="checkbox" role="switch" id="plannerOptionAutoProgress">
-                    <label class="form-check-label" for="plannerOptionAutoProgress">자동으로 진행 하기</label>
-                  </div>
-                  <div class="form-check form-switch mt-2">
-                    <input class="form-check-input" type="checkbox" role="switch" id="plannerOptionVoiceAuto" disabled>
-                    <label class="form-check-label d-flex align-items-center" for="plannerOptionVoiceAuto">
-                      음성 인식으로 자동 진행 하기
-                      <span class="badge bg-secondary ms-2">실험 기능</span>
+  <div id="plannerView">
+    <div class="row justify-content-center mb-4">
+      <div class="col-12 col-md-10 col-lg-8">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h2 class="card-title text-center mb-4">오늘의 묵주 기도</h2>
+            <p class="text-center text-secondary mb-2">오늘 함께 바칠 신비를 선택해 보세요.</p>
+            <p class="text-center text-muted small mb-4">월·토 환희 | 화·금 고통 | 수·일 영광 | 목요일 빛의 신비</p>
+            <div class="row gy-3">
+              <div class="col-12 col-sm-6">
+                <div class="form-check border rounded p-3 h-100 d-flex align-items-center justify-content-between">
+                  <div class="d-flex align-items-center">
+                    <input class="form-check-input me-2" type="checkbox" value="환의의 신비" id="plannerJoyful">
+                    <label class="form-check-label fw-semibold mb-0" for="plannerJoyful">
+                      환의의 신비
                     </label>
                   </div>
+                  <select class="form-select form-select-sm w-auto text-center" id="plannerJoyfulCount" aria-label="환의의 신비 단수 선택" disabled>
+                    <option value="1">1단</option>
+                    <option value="2">2단</option>
+                    <option value="3">3단</option>
+                    <option value="4">4단</option>
+                    <option value="5" selected>5단</option>
+                  </select>
+                </div>
+              </div>
+              <div class="col-12 col-sm-6">
+                <div class="form-check border rounded p-3 h-100 d-flex align-items-center justify-content-between">
+                  <div class="d-flex align-items-center">
+                    <input class="form-check-input me-2" type="checkbox" value="고통의 신비" id="plannerSorrowful">
+                    <label class="form-check-label fw-semibold mb-0" for="plannerSorrowful">
+                      고통의 신비
+                    </label>
+                  </div>
+                  <select class="form-select form-select-sm w-auto text-center" id="plannerSorrowfulCount" aria-label="고통의 신비 단수 선택" disabled>
+                    <option value="1">1단</option>
+                    <option value="2">2단</option>
+                    <option value="3">3단</option>
+                    <option value="4">4단</option>
+                    <option value="5" selected>5단</option>
+                  </select>
+                </div>
+              </div>
+              <div class="col-12 col-sm-6">
+                <div class="form-check border rounded p-3 h-100 d-flex align-items-center justify-content-between">
+                  <div class="d-flex align-items-center">
+                    <input class="form-check-input me-2" type="checkbox" value="영광의 신비" id="plannerGlorious">
+                    <label class="form-check-label fw-semibold mb-0" for="plannerGlorious">
+                      영광의 신비
+                    </label>
+                  </div>
+                  <select class="form-select form-select-sm w-auto text-center" id="plannerGloriousCount" aria-label="영광의 신비 단수 선택" disabled>
+                    <option value="1">1단</option>
+                    <option value="2">2단</option>
+                    <option value="3">3단</option>
+                    <option value="4">4단</option>
+                    <option value="5" selected>5단</option>
+                  </select>
+                </div>
+              </div>
+              <div class="col-12 col-sm-6">
+                <div class="form-check border rounded p-3 h-100 d-flex align-items-center justify-content-between">
+                  <div class="d-flex align-items-center">
+                    <input class="form-check-input me-2" type="checkbox" value="빛의 신비" id="plannerLuminous">
+                    <label class="form-check-label fw-semibold mb-0" for="plannerLuminous">
+                      빛의 신비
+                    </label>
+                  </div>
+                  <select class="form-select form-select-sm w-auto text-center" id="plannerLuminousCount" aria-label="빛의 신비 단수 선택" disabled>
+                    <option value="1">1단</option>
+                    <option value="2">2단</option>
+                    <option value="3">3단</option>
+                    <option value="4">4단</option>
+                    <option value="5" selected>5단</option>
+                  </select>
                 </div>
               </div>
             </div>
+            <div class="mt-4" id="plannerOptionsHome">
+              <div class="border rounded" id="plannerOptionsWrapper">
+                <button class="w-100 bg-transparent border-0 px-3 py-3 d-flex align-items-center justify-content-between" type="button" data-bs-toggle="collapse" data-bs-target="#plannerOptions" aria-expanded="false" aria-controls="plannerOptions">
+                  <span class="fw-semibold">옵션</span>
+                  <i class="bi bi-chevron-down" aria-hidden="true" id="plannerOptionsToggleIcon"></i>
+                </button>
+                <div class="collapse" id="plannerOptions">
+                  <div class="border-top px-3 pb-3 pt-3">
+                    <div class="form-check form-switch">
+                      <input class="form-check-input" type="checkbox" role="switch" id="plannerOptionTts">
+                      <label class="form-check-label" for="plannerOptionTts">TTS로 읽어 주기</label>
+                    </div>
+                    <div class="form-check form-switch mt-2">
+                      <input class="form-check-input" type="checkbox" role="switch" id="plannerOptionAutoProgress">
+                      <label class="form-check-label" for="plannerOptionAutoProgress">자동으로 진행 하기</label>
+                    </div>
+                    <div class="form-check form-switch mt-2">
+                      <input class="form-check-input" type="checkbox" role="switch" id="plannerOptionVoiceAuto" disabled>
+                      <label class="form-check-label d-flex align-items-center" for="plannerOptionVoiceAuto">
+                        음성 인식으로 자동 진행 하기
+                        <span class="badge bg-secondary ms-2">실험 기능</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="d-grid mt-4">
+              <button type="button" class="btn btn-primary btn-lg py-3" id="plannerStartButton" disabled>시작</button>
+            </div>
           </div>
-          <div class="d-grid mt-4">
-            <button type="button" class="btn btn-primary btn-lg py-3" id="plannerStartButton" disabled>시작</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="prayerView" class="d-none">
+    <div class="prayer-layout">
+      <div class="prayer-pane-top position-relative">
+        <div class="d-flex justify-content-between align-items-start p-4 h-100">
+          <div class="prayer-metadata">
+            <div class="d-flex align-items-baseline flex-wrap gap-2">
+              <h3 class="fw-bold mb-0" id="prayerCurrentMystery">환의의 신비</h3>
+              <div class="fw-semibold fs-5 text-muted" id="prayerCurrentDecade">1단</div>
+            </div>
           </div>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="prayerExitButton" aria-label="플래너로 돌아가기">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+        <div class="prayer-options-overlay position-absolute bottom-0 end-0 m-3" id="prayerOptionsOverlay">
+        </div>
+      </div>
+      <div class="prayer-pane-bottom">
+        <div class="prayer-lyric-area px-4 py-4">
+          <p class="lead fw-semibold mb-2">기도문이 여기에 표시됩니다.</p>
+          <p class="text-secondary">이 영역은 추후 묵주 기도문을 표시하기 위한 자리입니다.</p>
         </div>
       </div>
     </div>
@@ -319,7 +297,7 @@
   <div id="mdrow" class="row">
   </div>
 </main>
-  <footer style="text-align: center" class="pt-2">
+  <footer style="text-align: center" class="pt-2" id="mainFooter">
     <p class="fs-6"><small>평화를 빕니다! <a href="https://kcatholic-api.github.io/" target="_blank">한국어 가톨릭 API 프로젝트</a>를 방문하여 보세요.</small></p>
   </footer>
   </body>
@@ -434,6 +412,76 @@ function init_option_collapse_icon() {
   });
 }
 
+function reset_option_collapse_state() {
+  const optionsCollapseElement = document.getElementById("plannerOptions");
+  if (!optionsCollapseElement) {
+    return;
+  }
+  const collapseInstance = bootstrap.Collapse.getInstance(optionsCollapseElement);
+  if (collapseInstance) {
+    collapseInstance.hide();
+  } else {
+    $(optionsCollapseElement).removeClass("show");
+  }
+  $("#plannerOptionsToggleIcon").removeClass("bi-chevron-up").addClass("bi-chevron-down");
+}
+
+function move_options_to_overlay() {
+  const overlay = $("#prayerOptionsOverlay");
+  const wrapper = $("#plannerOptionsWrapper");
+  if (overlay.length && wrapper.length) {
+    overlay.append(wrapper);
+    reset_option_collapse_state();
+  }
+}
+
+function move_options_to_planner() {
+  const home = $("#plannerOptionsHome");
+  const wrapper = $("#plannerOptionsWrapper");
+  if (home.length && wrapper.length) {
+    home.append(wrapper);
+    reset_option_collapse_state();
+  }
+}
+
+function get_first_selected_mystery() {
+  for (const control of plannerMysteryControls) {
+    const checkboxElement = $(control.checkbox);
+    if (checkboxElement.length && checkboxElement.is(":checked")) {
+      const labelText = checkboxElement.closest(".d-flex.align-items-center").find("label").text().trim();
+      const decadeSelect = $(control.select);
+      const decadeValue = decadeSelect.length ? decadeSelect.val() || "5" : "5";
+      return {
+        title: labelText || "묵주 기도",
+        decade: `${decadeValue}단`
+      };
+    }
+  }
+  return {
+    title: "묵주 기도",
+    decade: "1단"
+  };
+}
+
+function enter_prayer_view() {
+  const { title, decade } = get_first_selected_mystery();
+  $("#prayerCurrentMystery").text(title);
+  $("#prayerCurrentDecade").text(decade);
+  move_options_to_overlay();
+  $("body").addClass("prayer-mode");
+  $("#mainNavbar, #mainFooter").addClass("d-none");
+  $("#plannerView").addClass("d-none");
+  $("#prayerView").removeClass("d-none");
+}
+
+function exit_prayer_view() {
+  move_options_to_planner();
+  $("body").removeClass("prayer-mode");
+  $("#mainNavbar, #mainFooter").removeClass("d-none");
+  $("#prayerView").addClass("d-none");
+  $("#plannerView").removeClass("d-none");
+}
+
 $(document).ready(function() {
   show_menu_title(false);
   select_default_mystery_for_today();
@@ -447,6 +495,8 @@ $(document).ready(function() {
   $("#plannerOptionAutoProgress").on("change", update_voice_auto_option);
   update_voice_auto_option();
   init_option_collapse_icon();
+  $("#plannerStartButton").on("click", enter_prayer_view);
+  $("#prayerExitButton").on("click", exit_prayer_view);
 
   if(window.location.hash == "") {
     if(localStorage.getItem(startup_dialog_version) != "no") {
