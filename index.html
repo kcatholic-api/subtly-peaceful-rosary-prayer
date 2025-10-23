@@ -247,7 +247,7 @@
             </div>
           </div>
           <div class="d-grid mt-4">
-            <button type="button" class="btn btn-primary btn-lg py-3" id="plannerStartButton">시작</button>
+            <button type="button" class="btn btn-primary btn-lg py-3" id="plannerStartButton" disabled>시작</button>
           </div>
         </div>
       </div>
@@ -317,9 +317,21 @@ function select_default_mystery_for_today() {
   }
 }
 
+function update_planner_start_button() {
+  const plannerCheckboxes = $("#plannerJoyful, #plannerSorrowful, #plannerGlorious, #plannerLuminous");
+  if (!plannerCheckboxes.length) {
+    return;
+  }
+  const hasSelection = plannerCheckboxes.is(":checked");
+  $("#plannerStartButton").prop("disabled", !hasSelection);
+}
+
 $(document).ready(function() {
   show_menu_title(false);
   select_default_mystery_for_today();
+  const plannerCheckboxes = $("#plannerJoyful, #plannerSorrowful, #plannerGlorious, #plannerLuminous");
+  plannerCheckboxes.on("change", update_planner_start_button);
+  update_planner_start_button();
 
   if(window.location.hash == "") {
     if(localStorage.getItem(startup_dialog_version) != "no") {
