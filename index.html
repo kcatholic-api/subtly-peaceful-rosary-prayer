@@ -214,35 +214,71 @@
           <p class="text-center text-muted small mb-4">월·토 환희 | 화·금 고통 | 수·일 영광 | 목요일 빛의 신비</p>
           <div class="row gy-3">
             <div class="col-12 col-sm-6">
-              <div class="form-check border rounded p-3 h-100">
-                <input class="form-check-input" type="checkbox" value="환의의 신비" id="plannerJoyful">
-                <label class="form-check-label fw-semibold" for="plannerJoyful">
-                  환의의 신비
-                </label>
+              <div class="form-check border rounded p-3 h-100 d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center">
+                  <input class="form-check-input me-2" type="checkbox" value="환의의 신비" id="plannerJoyful">
+                  <label class="form-check-label fw-semibold mb-0" for="plannerJoyful">
+                    환의의 신비
+                  </label>
+                </div>
+                <select class="form-select form-select-sm w-auto text-center" id="plannerJoyfulCount" aria-label="환의의 신비 단수 선택" disabled>
+                  <option value="1">1단</option>
+                  <option value="2">2단</option>
+                  <option value="3">3단</option>
+                  <option value="4">4단</option>
+                  <option value="5" selected>5단</option>
+                </select>
               </div>
             </div>
             <div class="col-12 col-sm-6">
-              <div class="form-check border rounded p-3 h-100">
-                <input class="form-check-input" type="checkbox" value="고통의 신비" id="plannerSorrowful">
-                <label class="form-check-label fw-semibold" for="plannerSorrowful">
-                  고통의 신비
-                </label>
+              <div class="form-check border rounded p-3 h-100 d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center">
+                  <input class="form-check-input me-2" type="checkbox" value="고통의 신비" id="plannerSorrowful">
+                  <label class="form-check-label fw-semibold mb-0" for="plannerSorrowful">
+                    고통의 신비
+                  </label>
+                </div>
+                <select class="form-select form-select-sm w-auto text-center" id="plannerSorrowfulCount" aria-label="고통의 신비 단수 선택" disabled>
+                  <option value="1">1단</option>
+                  <option value="2">2단</option>
+                  <option value="3">3단</option>
+                  <option value="4">4단</option>
+                  <option value="5" selected>5단</option>
+                </select>
               </div>
             </div>
             <div class="col-12 col-sm-6">
-              <div class="form-check border rounded p-3 h-100">
-                <input class="form-check-input" type="checkbox" value="영광의 신비" id="plannerGlorious">
-                <label class="form-check-label fw-semibold" for="plannerGlorious">
-                  영광의 신비
-                </label>
+              <div class="form-check border rounded p-3 h-100 d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center">
+                  <input class="form-check-input me-2" type="checkbox" value="영광의 신비" id="plannerGlorious">
+                  <label class="form-check-label fw-semibold mb-0" for="plannerGlorious">
+                    영광의 신비
+                  </label>
+                </div>
+                <select class="form-select form-select-sm w-auto text-center" id="plannerGloriousCount" aria-label="영광의 신비 단수 선택" disabled>
+                  <option value="1">1단</option>
+                  <option value="2">2단</option>
+                  <option value="3">3단</option>
+                  <option value="4">4단</option>
+                  <option value="5" selected>5단</option>
+                </select>
               </div>
             </div>
             <div class="col-12 col-sm-6">
-              <div class="form-check border rounded p-3 h-100">
-                <input class="form-check-input" type="checkbox" value="빛의 신비" id="plannerLuminous">
-                <label class="form-check-label fw-semibold" for="plannerLuminous">
-                  빛의 신비
-                </label>
+              <div class="form-check border rounded p-3 h-100 d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center">
+                  <input class="form-check-input me-2" type="checkbox" value="빛의 신비" id="plannerLuminous">
+                  <label class="form-check-label fw-semibold mb-0" for="plannerLuminous">
+                    빛의 신비
+                  </label>
+                </div>
+                <select class="form-select form-select-sm w-auto text-center" id="plannerLuminousCount" aria-label="빛의 신비 단수 선택" disabled>
+                  <option value="1">1단</option>
+                  <option value="2">2단</option>
+                  <option value="3">3단</option>
+                  <option value="4">4단</option>
+                  <option value="5" selected>5단</option>
+                </select>
               </div>
             </div>
           </div>
@@ -280,16 +316,17 @@ function never_see_startup() {
 function load_record() {
 }
 
-function select_default_mystery_for_today() {
-  const checkboxes = [
-    "#plannerJoyful",
-    "#plannerSorrowful",
-    "#plannerGlorious",
-    "#plannerLuminous"
-  ];
+const plannerMysteryControls = [
+  { checkbox: "#plannerJoyful", select: "#plannerJoyfulCount" },
+  { checkbox: "#plannerSorrowful", select: "#plannerSorrowfulCount" },
+  { checkbox: "#plannerGlorious", select: "#plannerGloriousCount" },
+  { checkbox: "#plannerLuminous", select: "#plannerLuminousCount" }
+];
+const plannerCheckboxSelector = plannerMysteryControls.map((control) => control.checkbox).join(", ");
 
-  checkboxes.forEach((selector) => {
-    const element = $(selector);
+function select_default_mystery_for_today() {
+  plannerMysteryControls.forEach(({ checkbox }) => {
+    const element = $(checkbox);
     if (element.length) {
       element.prop("checked", false);
     }
@@ -315,10 +352,11 @@ function select_default_mystery_for_today() {
     default:
       break;
   }
+  update_mystery_count_states();
 }
 
 function update_planner_start_button() {
-  const plannerCheckboxes = $("#plannerJoyful, #plannerSorrowful, #plannerGlorious, #plannerLuminous");
+  const plannerCheckboxes = $(plannerCheckboxSelector);
   if (!plannerCheckboxes.length) {
     return;
   }
@@ -326,12 +364,32 @@ function update_planner_start_button() {
   $("#plannerStartButton").prop("disabled", !hasSelection);
 }
 
+function update_mystery_count_states() {
+  plannerMysteryControls.forEach(({ checkbox, select }) => {
+    const checkboxElement = $(checkbox);
+    const selectElement = $(select);
+    if (!selectElement.length) {
+      return;
+    }
+    const checked = checkboxElement.is(":checked");
+    const wasDisabled = selectElement.prop("disabled");
+    selectElement.prop("disabled", !checked);
+    if (checked && wasDisabled) {
+      selectElement.val("5");
+    }
+  });
+}
+
 $(document).ready(function() {
   show_menu_title(false);
   select_default_mystery_for_today();
-  const plannerCheckboxes = $("#plannerJoyful, #plannerSorrowful, #plannerGlorious, #plannerLuminous");
-  plannerCheckboxes.on("change", update_planner_start_button);
+  const plannerCheckboxes = $(plannerCheckboxSelector);
+  plannerCheckboxes.on("change", function() {
+    update_planner_start_button();
+    update_mystery_count_states();
+  });
   update_planner_start_button();
+  update_mystery_count_states();
 
   if(window.location.hash == "") {
     if(localStorage.getItem(startup_dialog_version) != "no") {
