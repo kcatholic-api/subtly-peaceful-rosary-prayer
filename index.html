@@ -1,0 +1,248 @@
+
+<!doctype html>
+<html lang="en" data-bs-theme="auto">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="생각보다 은근히 평안한 묵주 기도 도우미">
+    <!--<meta name="author" content="">-->
+    <title>생각보다 은근히 평안한 묵주 기도 도우미</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-SgOJa3DmI69IUzQ2PVdRZhwQ+dy64/BUtbMJw1MZ8t5HZApcHrRKUc4W0kG879m7" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/js/bootstrap.bundle.min.js" integrity="sha384-k6d4wzSIapyDyv1kpU366/PK5hCdSbCRGRCMv+eplOQJWyd1fbcAu9OCUj5zNLiq" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" integrity="sha512-dPXYcDub/aeb08c63jRq/k6GaKccl256JQy/AnOq7CAnEZ9FzSL9wSbcZkMp4R26vBsMLFYH4kQ67/bbV8XaCQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js" integrity="sha512-v2CJ7UaYy4JwqLDIrZUI/4hqeoQieOmAZNXBeQyjo21dadnwR+8ZaIJVT8EE2iyI61OV8e6M8PP2/4hpQINQ/g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <link rel="icon" href="favicon.ico">
+
+  </head>
+  <body>
+<nav class="navbar navbar-expand-md navbar-dark bg-dark mb-4">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="" id="menu_title">묵주 기도 도우미</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarCollapse">
+      <ul class="navbar-nav me-auto mb-2 mb-md-0">
+        <li class="nav-item">
+          <a class="nav-link" aria-current="page" href="#" onclick="load_record()">나의 기록</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<!-- First Modal -->
+<div class="modal fade" id="startupModal" tabindex="-1" aria-labelledby="startupModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-5" id="startupModalLabel"><small><i>생각보다 은근히 평안한</i></small><br/>묵주 기도 도우미</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+      </div>
+      <div class="modal-body">
+        <p>
+        평화를 빕니다!
+        </p>
+        <p>
+        이 웹사이트는 어려운 가톨릭 묵주 기도를 생각보다 편리하고 평안한 기분으로 시도해 볼 수 있는 기능을 제공하여 전 세계 한인 가톨릭 공동체의 형제자매님들께 도움이 되고자 만들어졌습니다.
+        </p>
+        <small>
+        이 웹사이트는 <b>데스크톱</b> 브라우저 환경에 최적화되어 있습니다. 혹시! 모바일에서 열어보셨다면 <i>생각보다 은근히</i> 불편하실 수 있으니, 집에 돌아가신 후 컴퓨터로 다시 방문하시길 권해드립니다.
+        </small>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="never_see_startup()">다시 보지 않기</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Load Modal -->
+<div class="modal fade" id="loadModal" tabindex="-1" aria-labelledby="loadModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-5" id="loadModalLabel">로컬 브라우저 저장소 불러오기</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+      </div>
+      <div class="modal-body">
+        <p>
+          <small>어떻게 작동 하나요?</small> <a id="readMore3" data-bs-toggle="collapse" href="#moreText3" aria-expanded="false" aria-controls="moreText3"><small>자세히</small></a></small>
+          <span id="moreText3" class="collapse"><br/><small>편집기로 작성 중인 Markdown 문서에서 Heading 1 (#) 또는 Heading 2 (##) 가 적용된 문자열을 추출해서 문서 제목으로 간주 합니다. 이 제목을 Key로 정하고 웹 표준 기술인 <a href="https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API" target="_blank">Web Storage API</a>을 이용하여 전체 Markdown 데이타를 사용중인 디바이스의 웹브라우저에 저장하고 불러 옵니다. 따라서 서버에는 그 어떤 정보도 저장되지 않습니다.</small><br/>
+          <small>로컬 브라우저 저장소는 어떤 이유에서건 사라질 수 있습니다. 작성하신 문서는 다운로드 기능을 사용하여 Markdown (확장자.md) 파일로 직접 안전하게 저장해 두시는 것을 권장합니다.</small></span>
+        </p>
+        <div class="list-group" id="saved">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Share Modal -->
+<div class="modal fade" id="shareModal" tabindex="-1" aria-labelledby="shareModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-5" id="shareModalLabel">다른 슬라이드덱 봉사자와 편집 내용 공유하기</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+      </div>
+      <div class="modal-body">
+        <p>
+          <small>편집 중인 마크다운 소스를 직접 파일에 저장 또는 Email로 공유 하거나 다음의 주소를 보내어 다른 사람과 편집 내용을 쉽게 공유할 수 있습니다.</small>
+        </p>
+        <p>
+          <small>어떻게 작동 하나요?</small> <a id="readMore2" data-bs-toggle="collapse" href="#moreText2" aria-expanded="false" aria-controls="moreText2"><small>자세히</small></a></small>
+          <span id="moreText2" class="collapse"><br/><small>편집기에 입력된 Markdown 텍스트는 gzip 으로 압축 된 뒤 Base64로 인코딩 되어 현재 웹페이지의 URL에 해시(#) 식별자 형식으로 연결됩니다. 이 긴 URL은 E-mail이나 메신저 등을 통해 공유되며, 전달 받는 측에서 역순으로 해시(#) 식별자 정보를 디코딩 및 압축 해제되어 편집기에 입력되어 작업을 이어갈 수 있습니다.</small><br/>
+          <small>URL이 다소 길순 있지만 뭐 괜찮습니다.</small></span>
+        </p>
+        <div class="card">
+          <h5 class="card-header">URL</h5>
+          <div class="card-body" id="shareURL">
+          </div>
+        </div>
+
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal" onclick="clipboard.copy($('#shareURL').text().trim());">복사</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-5" id="settingsModalLabel">Markdown 에디터 설정</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+      </div>
+      <div class="modal-body">
+        <input class="form-check-input" type="checkbox" value="" id="vim_mode" onclick="set_keybinding(this.checked)">
+        <label class="form-check-label" for="vim_mode" data-bs-toggle="tooltip" data-bs-placement="top" title="Vim 키 바인딩으로 편집합니다">
+          Vim 키바인딩&nbsp;&nbsp;
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Month Modal -->
+<div class="modal fade" id="monthModal" tabindex="-1" aria-labelledby="monthModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-5" id="monthModalLabel">불러오기</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+      </div>
+      <div class="modal-body">
+        <div class="list-group" id="month_list">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Hymn Modal -->
+<div class="modal fade" id="hymnModal" tabindex="-1" aria-labelledby="hymnModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-5" id="hymnModalLabel">불러오기</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+      </div>
+      <div class="modal-body">
+        <div class="list-group" id="hymn_list">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div id="hymn_preview" class="alert alert-secondary" style="width: 100%" role="alert"></div>
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal" id="hymn_add_button" style="display: none" onclick="add_hymn()">추가</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Prayer Modal -->
+<div class="modal fade" id="prayerModal" tabindex="-1" aria-labelledby="prayerModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-5" id="prayerModalLabel">기도문 목록</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+      </div>
+      <div class="modal-body">
+        <div class="list-group" id="prayer_list">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div id="prayer_preview" class="alert alert-secondary" style="width: 100%" role="alert"></div>
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal" id="prayer_add_button" style="display: none" onclick="add_prayer()">추가</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<main class="container-fluid">
+  <div class="row ms-1 me-1">
+    <div id="notice_div" class="alert alert-primary" role="alert" style="display: none"></div>
+    <div id="error_div" class="alert alert-danger" role="alert" style="display: none"></div>
+  </div>
+  <div id="mdrow" class="row">
+  </div>
+</main>
+  <footer style="text-align: center" class="pt-2">
+    <p class="fs-6"><small>평화를 빕니다! <a href="https://kcatholic-api.github.io/" target="_blank">한국어 가톨릭 API 프로젝트</a>를 방문하여 보세요.</small></p>
+  </footer>
+  </body>
+
+<script>
+function show_catch_phrase() {
+  $("#menu_title").text("생각보다 은근히 평안한").fadeIn(500).delay(5000).fadeOut(500, show_menu_title);
+}
+function show_menu_title(fade=true) {
+  if(fade)
+    $("#menu_title").text("묵주 기도 도우미").fadeIn(500).delay(25000).fadeOut(500, show_catch_phrase);
+  else
+    $("#menu_title").text("묵주 기도 도우미").delay(25000).fadeOut(500, show_catch_phrase);
+}
+
+var startup_dialog_version = "kcatolic-api-sprp-startup-message-v1";
+function never_see_startup() {
+  localStorage.setItem(startup_dialog_version, "no");
+}
+
+function load_record() {
+}
+
+$(document).ready(function() {
+  show_menu_title(false);
+
+  if(window.location.hash == "") {
+    if(localStorage.getItem(startup_dialog_version) != "no") {
+      console.log("show startup");
+      $("#startupModal").modal("show");
+    }
+  }
+});
+
+</script>
+
+</html>
