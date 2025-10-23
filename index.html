@@ -360,6 +360,29 @@ const plannerMysteryControls = [
   { checkbox: "#plannerLuminous", select: "#plannerLuminousCount" }
 ];
 const plannerCheckboxSelector = plannerMysteryControls.map((control) => control.checkbox).join(", ");
+const settingsPrefix = "kcatolic-api-sprp-settings.";
+let voiceAutoPreference = false;
+
+function readSetting(key, defaultValue) {
+  try {
+    const raw = localStorage.getItem(settingsPrefix + key);
+    if (raw === null) {
+      return defaultValue;
+    }
+    return JSON.parse(raw);
+  } catch (error) {
+    console.warn("Failed to read setting", key, error);
+    return defaultValue;
+  }
+}
+
+function writeSetting(key, value) {
+  try {
+    localStorage.setItem(settingsPrefix + key, JSON.stringify(value));
+  } catch (error) {
+    console.warn("Failed to write setting", key, error);
+  }
+}
 
 function select_default_mystery_for_today() {
   plannerMysteryControls.forEach(({ checkbox }) => {
@@ -425,9 +448,30 @@ function update_voice_auto_option() {
   }
   const enableVoiceAuto = autoProgressCheckbox.is(":checked");
   voiceAutoCheckbox.prop("disabled", !enableVoiceAuto);
-  if (!enableVoiceAuto) {
+  if (enableVoiceAuto) {
+    voiceAutoCheckbox.prop("checked", voiceAutoPreference);
+  } else {
     voiceAutoCheckbox.prop("checked", false);
   }
+}
+
+function load_option_settings() {
+  const ttsPref = !!readSetting("option.tts", false);
+  $("#plannerOptionTts").prop("checked", ttsPref);
+
+  const autoPref = !!readSetting("option.autoProgress", false);
+  $("#plannerOptionAutoProgress").prop("checked", autoPref);
+
+  voiceAutoPreference = !!readSetting("option.voiceAuto", false);
+
+  const fullscreenPref = !!readSetting("option.fullscreen", false);
+  if (document.fullscreenElement) {
+    $("#plannerOptionFullscreen").prop("checked", true);
+  } else {
+    $("#plannerOptionFullscreen").prop("checked", fullscreenPref);
+  }
+
+  update_voice_auto_option();
 }
 
 function init_option_collapse_icon() {
@@ -449,6 +493,7 @@ function toggle_fullscreen(enabled) {
     if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
       document.documentElement.requestFullscreen().catch(() => {
         $("#plannerOptionFullscreen").prop("checked", false);
+        writeSetting("option.fullscreen", false);
       });
     }
   } else {
@@ -464,6 +509,7 @@ function sync_fullscreen_checkbox() {
     return;
   }
   checkbox.prop("checked", !!document.fullscreenElement);
+  writeSetting("option.fullscreen", checkbox.is(":checked"));
 }
 
 document.addEventListener("fullscreenchange", sync_fullscreen_checkbox);
@@ -524,7 +570,12 @@ function enter_prayer_view() {
   $("#prayerCurrentMystery").text(title);
   $("#prayerCurrentDecade").text(decade);
   move_options_to_overlay();
-  sync_fullscreen_checkbox();
+  const wantsFullscreen = !!readSetting("option.fullscreen", false);
+  if (wantsFullscreen && !document.fullscreenElement) {
+    toggle_fullscreen(true);
+  } else {
+    sync_fullscreen_checkbox();
+  }
   $("body").addClass("prayer-mode");
   $("#mainNavbar, #mainFooter").addClass("d-none");
   $("#plannerView").addClass("d-none");
@@ -542,6 +593,7 @@ function exit_prayer_view() {
 $(document).ready(function() {
   show_menu_title(false);
   select_default_mystery_for_today();
+  load_option_settings();
   const plannerCheckboxes = $(plannerCheckboxSelector);
   plannerCheckboxes.on("change", function() {
     update_planner_start_button();
@@ -549,11 +601,23 @@ $(document).ready(function() {
   });
   update_planner_start_button();
   update_mystery_count_states();
-  $("#plannerOptionAutoProgress").on("change", update_voice_auto_option);
-  update_voice_auto_option();
+  $("#plannerOptionTts").on("change", function() {
+    writeSetting("option.tts", $(this).is(":checked"));
+  });
+  $("#plannerOptionAutoProgress").on("change", function() {
+    const enabled = $(this).is(":checked");
+    writeSetting("option.autoProgress", enabled);
+    update_voice_auto_option();
+  });
+  $("#plannerOptionVoiceAuto").on("change", function() {
+    voiceAutoPreference = $(this).is(":checked");
+    writeSetting("option.voiceAuto", voiceAutoPreference);
+  });
   init_option_collapse_icon();
   $("#plannerOptionFullscreen").on("change", function() {
-    toggle_fullscreen($(this).is(":checked"));
+    const enabled = $(this).is(":checked");
+    writeSetting("option.fullscreen", enabled);
+    toggle_fullscreen(enabled);
   });
   $("#plannerStartButton").on("click", enter_prayer_view);
   $("#prayerExitButton").on("click", exit_prayer_view);
