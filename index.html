@@ -39,6 +39,20 @@
       .prayer-lyric-area {
         flex: 1 1 auto;
         overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: stretch;
+        text-align: center;
+      }
+      .prayer-step-title {
+        text-align: left;
+      }
+      .prayer-step-body {
+        flex: 1 1 auto;
+        display: flex;
+        justify-content: center;
+        align-items: center;
       }
       .prayer-options-overlay {
         max-width: 320px;
@@ -315,13 +329,20 @@
             <i class="bi bi-x-lg"></i>
           </button>
         </div>
-        <div class="prayer-options-overlay position-absolute bottom-0 end-0 m-3" id="prayerOptionsOverlay">
+        <div class="prayer-options-overlay position-absolute bottom-0 start-0 m-3" id="prayerOptionsOverlay">
         </div>
+        <button type="button" class="btn btn-primary position-absolute bottom-0 end-0 m-3" id="prayerNextButton">
+          다음
+        </button>
       </div>
       <div class="prayer-pane-bottom">
         <div class="prayer-lyric-area px-4 py-4">
-          <p class="lead fw-semibold mb-2">기도문이 여기에 표시됩니다.</p>
-          <p class="text-secondary">이 영역은 추후 묵주 기도문을 표시하기 위한 자리입니다.</p>
+          <div class="prayer-step-title w-100 mb-3">
+            <p class="text-secondary fw-semibold mb-0" id="prayerCurrentStepTitle">이 영역은 추후 묵주 기도문을 표시하기 위한 자리입니다.</p>
+          </div>
+          <div class="prayer-step-body w-100">
+            <p class="lead fw-semibold mb-0 text-center w-100" id="prayerCurrentStepContent">기도문이 여기에 표시됩니다.</p>
+          </div>
         </div>
       </div>
     </div>
@@ -362,6 +383,236 @@ const plannerMysteryControls = [
 const plannerCheckboxSelector = plannerMysteryControls.map((control) => control.checkbox).join(", ");
 const settingsPrefix = "kcatolic-api-sprp-settings.";
 let voiceAutoPreference = false;
+let prayerSequence = [];
+let prayerSequenceIndex = 0;
+
+const rosaryPrayerTexts = {
+  apostlesCreed: "전능하신 천주 성부, 천지의 창조주를 저는 믿나이다.\n그 외아들 우리 주 예수 그리스도님,\n성령으로 인하여 동정 마리아께 잉태되어 나시고,\n본시오 빌라도 통치 아래에서 고난을 받으시고,\n십자가에 못 박혀 돌아가시고 묻히셨으며,\n저승에 가시어 사흗날에 죽은 이들 가운데서 부활하시고,\n하늘에 올라 전능하신 천주 성부 오른편에 앉아 계시며,\n그리로부터 산 이와 죽은 이를 심판하러 오시리라 믿나이다.\n성령을 믿으며,\n거룩하고 보편된 교회와 모든 성인의 통공을 믿으며,\n죄의 용서와 육신의 부활을 믿으며,\n영원한 삶을 믿나이다. 아멘.",
+  ourFather: "하늘에 계신 우리 아버지,\n아버지의 이름이 거룩히 빛나시며\n아버지의 나라가 오시며\n아버지의 뜻이 하늘에서와 같이 땅에서도 이루어지소서.\n오늘 저희에게 일용할 양식을 주시고\n저희에게 잘못한 이를 저희가 용서하오니\n저희 죄를 용서하시고\n저희를 유혹에 빠지지 않게 하시고\n악에서 구하소서. 아멘.",
+  hailMary: "은총이 가득하신 마리아님, 기뻐하소서.\n주님께서 함께 계시니 여인 중에 복되시며\n태중의 아들 예수님 또한 복되시나이다.\n천주의 성모 마리아님,\n이제와 저희 죽을 때에 저희 죄인을 위하여 빌어주소서. 아멘.",
+  gloryBe: "영광이 성부와 성자와 성령께,\n처음과 같이 이제와 항상 영원히. 아멘.",
+  fatimaPrayer: "오 나의 예수님,\n우리의 죄를 용서하시며 우리를 지옥 불에서 구하시고,\n연옥 영혼을 돌보시며 가장 버림받은 영혼을 돌보소서. 아멘."
+};
+
+const rosaryMysteryData = {
+  "#plannerJoyful": {
+    key: "joyful",
+    title: "환의의 신비",
+    decades: [
+      { label: "1단", meditation: "마리아께서 예수님을 잉태하심을 묵상합시다." },
+      { label: "2단", meditation: "마리아께서 엘리사벳을 찾아가 도와드림을 묵상합시다." },
+      { label: "3단", meditation: "예수님께서 탄생하심을 묵상합시다." },
+      { label: "4단", meditation: "마리아와 요셉이 예수님을 성전에 봉헌함을 묵상합시다." },
+      { label: "5단", meditation: "예수님께서 성전에서 율법 학자들과 토론하심을 묵상합시다." }
+    ]
+  },
+  "#plannerSorrowful": {
+    key: "sorrowful",
+    title: "고통의 신비",
+    decades: [
+      { label: "1단", meditation: "예수님께서 우리를 위하여 피땀 흘리심을 묵상합시다." },
+      { label: "2단", meditation: "예수님께서 우리를 위하여 매맞으심을 묵상합시다." },
+      { label: "3단", meditation: "예수님께서 우리를 위하여 가시관 쓰심을 묵상합시다." },
+      { label: "4단", meditation: "예수님께서 우리를 위하여 십자가를 지심을 묵상합시다." },
+      { label: "5단", meditation: "예수님께서 우리를 위하여 십자가 위에서 돌아가심을 묵상합시다." }
+    ]
+  },
+  "#plannerGlorious": {
+    key: "glorious",
+    title: "영광의 신비",
+    decades: [
+      { label: "1단", meditation: "예수님께서 부활하심을 묵상합시다." },
+      { label: "2단", meditation: "예수님께서 승천하심을 묵상합시다." },
+      { label: "3단", meditation: "성령께서 강림하심을 묵상합시다." },
+      { label: "4단", meditation: "마리아께서 하늘에 올림을 받으심을 묵상합시다." },
+      { label: "5단", meditation: "마리아께서 하늘의 모후로 관을 쓰심을 묵상합시다." }
+    ]
+  },
+  "#plannerLuminous": {
+    key: "luminous",
+    title: "빛의 신비",
+    decades: [
+      { label: "1단", meditation: "예수님께서 세례를 받으심을 묵상합시다." },
+      { label: "2단", meditation: "예수님께서 가나의 혼인 잔치를 통해 첫 기적을 베푸심을 묵상합시다." },
+      { label: "3단", meditation: "예수님께서 하느님 나라를 선포하심을 묵상합시다." },
+      { label: "4단", meditation: "예수님께서 거룩하게 변모하심을 묵상합시다." },
+      { label: "5단", meditation: "예수님께서 성체 성사를 제정하심을 묵상합시다." }
+    ]
+  }
+};
+
+function create_intro_steps() {
+  return [
+    {
+      type: "intro",
+      mysteryTitle: "묵주 기도",
+      decadeLabel: "",
+      title: "준비",
+      content: "성호경 및 십자가에 입맞춤"
+    },
+    {
+      type: "intro",
+      mysteryTitle: "묵주 기도",
+      decadeLabel: "",
+      title: "사도신경",
+      content: rosaryPrayerTexts.apostlesCreed
+    },
+    {
+      type: "intro",
+      mysteryTitle: "묵주 기도",
+      decadeLabel: "",
+      title: "주님의 기도",
+      content: rosaryPrayerTexts.ourFather
+    },
+    {
+      type: "intro",
+      mysteryTitle: "묵주 기도",
+      decadeLabel: "",
+      title: "성모송 (1/3)",
+      content: rosaryPrayerTexts.hailMary
+    },
+    {
+      type: "intro",
+      mysteryTitle: "묵주 기도",
+      decadeLabel: "",
+      title: "성모송 (2/3)",
+      content: rosaryPrayerTexts.hailMary
+    },
+    {
+      type: "intro",
+      mysteryTitle: "묵주 기도",
+      decadeLabel: "",
+      title: "성모송 (3/3)",
+      content: rosaryPrayerTexts.hailMary
+    },
+    {
+      type: "intro",
+      mysteryTitle: "묵주 기도",
+      decadeLabel: "",
+      title: "영광송",
+      content: rosaryPrayerTexts.gloryBe
+    },
+    {
+      type: "intro",
+      mysteryTitle: "묵주 기도",
+      decadeLabel: "",
+      title: "구원을 위한 기도",
+      content: rosaryPrayerTexts.fatimaPrayer
+    }
+  ];
+}
+
+function create_decade_steps({ mysteryTitle, decadeLabel, meditation, hailMaryCount }) {
+  const steps = [];
+  steps.push({
+    type: "meditation",
+    mysteryTitle,
+    decadeLabel,
+    title: `${decadeLabel} 묵상`,
+    content: meditation
+  });
+  steps.push({
+    type: "prayer",
+    mysteryTitle,
+    decadeLabel,
+    title: "주님의 기도",
+    content: rosaryPrayerTexts.ourFather
+  });
+  for (let i = 1; i <= hailMaryCount; i += 1) {
+    steps.push({
+      type: "prayer",
+      mysteryTitle,
+      decadeLabel,
+      title: "성모송",
+      content: rosaryPrayerTexts.hailMary,
+      progressLabel: `${i}/${hailMaryCount}`
+    });
+  }
+  steps.push({
+    type: "prayer",
+    mysteryTitle,
+    decadeLabel,
+    title: "영광송",
+    content: rosaryPrayerTexts.gloryBe
+  });
+  steps.push({
+    type: "prayer",
+    mysteryTitle,
+    decadeLabel,
+    title: "구원의 기도",
+    content: rosaryPrayerTexts.fatimaPrayer
+  });
+  return steps;
+}
+
+function build_prayer_sequence() {
+  const sequence = create_intro_steps();
+  plannerMysteryControls.forEach(({ checkbox, select }) => {
+    const checkboxElement = $(checkbox);
+    const selectElement = $(select);
+    const data = rosaryMysteryData[checkbox];
+    if (!checkboxElement.length || !checkboxElement.is(":checked") || !data) {
+      return;
+    }
+    const requestedCount = parseInt(selectElement.val(), 10) || data.decades.length;
+    const effectiveCount = Math.min(requestedCount, data.decades.length);
+    for (let index = 0; index < effectiveCount; index += 1) {
+      const decade = data.decades[index];
+      sequence.push(...create_decade_steps({
+        mysteryTitle: data.title,
+        decadeLabel: decade.label,
+        meditation: decade.meditation,
+        hailMaryCount: 10
+      }));
+    }
+  });
+  return sequence;
+}
+
+function render_prayer_navigation_state() {
+  const hasNext = prayerSequenceIndex < prayerSequence.length - 1;
+  const nextButton = $("#prayerNextButton");
+  if (!nextButton.length) {
+    return;
+  }
+  if (!prayerSequence.length) {
+    nextButton.prop("disabled", true).text("다음");
+    return;
+  }
+  if (hasNext) {
+    nextButton.prop("disabled", false).text("다음");
+  } else {
+    nextButton.prop("disabled", true).text("완료");
+  }
+}
+
+function render_prayer_step() {
+  if (!prayerSequence.length) {
+    $("#prayerCurrentMystery").text("묵주 기도");
+    $("#prayerCurrentDecade").text("");
+    $("#prayerCurrentStepTitle").text("기도문");
+    $("#prayerCurrentStepContent").text("묵주 기도를 시작하려면 단수를 선택해 주세요.");
+    render_prayer_navigation_state();
+    return;
+  }
+  const step = prayerSequence[prayerSequenceIndex];
+  $("#prayerCurrentMystery").text(step.mysteryTitle || "묵주 기도");
+  $("#prayerCurrentDecade").text(step.decadeLabel || "");
+  const titleText = step.progressLabel ? `${step.title} (${step.progressLabel})` : step.title;
+  $("#prayerCurrentStepTitle").text(titleText);
+  $("#prayerCurrentStepContent").html(step.content.replace(/\n/g, "<br>"));
+  render_prayer_navigation_state();
+}
+
+function advance_prayer_step() {
+  if (!prayerSequence.length) {
+    return;
+  }
+  if (prayerSequenceIndex < prayerSequence.length - 1) {
+    prayerSequenceIndex += 1;
+    render_prayer_step();
+  }
+}
 
 function readSetting(key, defaultValue) {
   try {
@@ -546,29 +797,10 @@ function move_options_to_planner() {
   }
 }
 
-function get_first_selected_mystery() {
-  for (const control of plannerMysteryControls) {
-    const checkboxElement = $(control.checkbox);
-    if (checkboxElement.length && checkboxElement.is(":checked")) {
-      const labelText = checkboxElement.closest(".d-flex.align-items-center").find("label").text().trim();
-      const decadeSelect = $(control.select);
-      const decadeValue = decadeSelect.length ? decadeSelect.val() || "5" : "5";
-      return {
-        title: labelText || "묵주 기도",
-        decade: `${decadeValue}단`
-      };
-    }
-  }
-  return {
-    title: "묵주 기도",
-    decade: "1단"
-  };
-}
-
 function enter_prayer_view() {
-  const { title, decade } = get_first_selected_mystery();
-  $("#prayerCurrentMystery").text(title);
-  $("#prayerCurrentDecade").text(decade);
+  prayerSequence = build_prayer_sequence();
+  prayerSequenceIndex = 0;
+  render_prayer_step();
   move_options_to_overlay();
   const wantsFullscreen = !!readSetting("option.fullscreen", false);
   if (wantsFullscreen && !document.fullscreenElement) {
@@ -583,6 +815,9 @@ function enter_prayer_view() {
 }
 
 function exit_prayer_view() {
+  prayerSequence = [];
+  prayerSequenceIndex = 0;
+  render_prayer_step();
   move_options_to_planner();
   $("body").removeClass("prayer-mode");
   $("#mainNavbar, #mainFooter").removeClass("d-none");
@@ -621,6 +856,8 @@ $(document).ready(function() {
   });
   $("#plannerStartButton").on("click", enter_prayer_view);
   $("#prayerExitButton").on("click", exit_prayer_view);
+  $("#prayerNextButton").on("click", advance_prayer_step);
+  render_prayer_step();
 
   if(window.location.hash == "") {
     if(localStorage.getItem(startup_dialog_version) != "no") {
