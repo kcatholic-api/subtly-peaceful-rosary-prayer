@@ -391,7 +391,8 @@ const rosaryPrayerTexts = {
   ourFather: "하늘에 계신 우리 아버지,\n아버지의 이름이 거룩히 빛나시며\n아버지의 나라가 오시며\n아버지의 뜻이 하늘에서와 같이 땅에서도 이루어지소서.\n오늘 저희에게 일용할 양식을 주시고\n저희에게 잘못한 이를 저희가 용서하오니\n저희 죄를 용서하시고\n저희를 유혹에 빠지지 않게 하시고\n악에서 구하소서. 아멘.",
   hailMary: "은총이 가득하신 마리아님, 기뻐하소서.\n주님께서 함께 계시니 여인 중에 복되시며\n태중의 아들 예수님 또한 복되시나이다.\n천주의 성모 마리아님,\n이제와 저희 죽을 때에 저희 죄인을 위하여 빌어주소서. 아멘.",
   gloryBe: "영광이 성부와 성자와 성령께,\n처음과 같이 이제와 항상 영원히. 아멘.",
-  fatimaPrayer: "오 나의 예수님,\n우리의 죄를 용서하시며 우리를 지옥 불에서 구하시고,\n연옥 영혼을 돌보시며 가장 버림받은 영혼을 돌보소서. 아멘."
+  fatimaPrayer: "오 나의 예수님,\n우리의 죄를 용서하시며 우리를 지옥 불에서 구하시고,\n연옥 영혼을 돌보시며 가장 버림받은 영혼을 돌보소서. 아멘.",
+  hailHolyQueen: "천상 모후, 사랑이 불타는 어머니,\n우리의 생명, 기쁨, 희망이시여!\n당신 우러러 하와의 그 자손들,\n눈물의 골짜기에서 통곡하며 부르짖나이다.\n우리들의 보호자 성모님,\n불쌍한 저희를 인자로운 눈으로 굽어보소서.\n귀양살이 끝날 때에 당신의 지극히 사랑하올\n아들 예수를 저희에게 보이소서.\n너그러우시고, 자애로우시며,\n오 아름다우신 동정 마리아님.\n천주의 성모님,\n저희를 위하여 빌어주시어\n그리스도께서 약속하신 영원한 생명을 얻게 하소서. 아멘."
 };
 
 const rosaryMysteryData = {
@@ -448,7 +449,7 @@ function create_intro_steps() {
       mysteryTitle: "묵주 기도",
       decadeLabel: "",
       title: "준비",
-      content: "성호경 및 십자가에 입맞춤"
+      content: "성호경 및 십자가의 예수님 발에 입맞춤"
     },
     {
       type: "intro",
@@ -498,6 +499,25 @@ function create_intro_steps() {
       decadeLabel: "",
       title: "구원을 위한 기도",
       content: rosaryPrayerTexts.fatimaPrayer
+    }
+  ];
+}
+
+function create_concluding_steps() {
+  return [
+    {
+      type: "conclusion",
+      mysteryTitle: "묵주 기도",
+      decadeLabel: "",
+      title: "성모찬송",
+      content: rosaryPrayerTexts.hailHolyQueen
+    },
+    {
+      type: "conclusion",
+      mysteryTitle: "묵주 기도",
+      decadeLabel: "",
+      title: "마무리",
+      content: "성호경 및 십자가의 예수님 발에 입맞춤"
     }
   ];
 }
@@ -566,6 +586,7 @@ function build_prayer_sequence() {
       }));
     }
   });
+  sequence.push(...create_concluding_steps());
   return sequence;
 }
 
