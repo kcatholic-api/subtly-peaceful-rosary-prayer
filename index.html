@@ -24,11 +24,6 @@
         min-height: calc(100vh - 160px);
         gap: 1rem;
       }
-      .prayer-pane-top {
-        background-color: #f8f9fa;
-        border: 1px solid #dee2e6;
-        border-radius: 0.75rem;
-      }
       .prayer-pane-bottom {
         background-color: #ffffff;
         border: 1px solid #dee2e6;
@@ -353,6 +348,9 @@
             <h3 class="fw-bold mb-0" id="prayerCurrentMystery">환의의 신비</h3>
             <div class="fw-semibold fs-5 text-muted" id="prayerCurrentDecade">1단</div>
           </div>
+          <div class="prayer-step-title w-100 mb-3">
+            <p class="text-secondary fw-semibold mb-0" id="prayerCurrentStepTitle">이 영역은 추후 묵주 기도문을 표시하기 위한 자리입니다.</p>
+          </div>
         </div>
         <button type="button" class="btn btn-outline-secondary btn-sm position-absolute top-0 end-0 m-0 m-3" id="prayerExitButton" aria-label="플래너로 돌아가기">
           <i class="bi bi-x-lg"></i>
@@ -375,9 +373,6 @@
       </div>
       <div class="prayer-pane-bottom">
         <div class="prayer-lyric-area px-4 py-4">
-          <div class="prayer-step-title w-100 mb-3">
-            <p class="text-secondary fw-semibold mb-0" id="prayerCurrentStepTitle">이 영역은 추후 묵주 기도문을 표시하기 위한 자리입니다.</p>
-          </div>
           <div class="prayer-step-body w-100">
             <p class="lead fw-semibold mb-0 text-center w-100" id="prayerCurrentStepContent">기도문이 여기에 표시됩니다.</p>
           </div>
