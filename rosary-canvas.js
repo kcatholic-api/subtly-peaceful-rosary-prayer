@@ -20,24 +20,29 @@
     CROSS_WIDTH: 24,
     CROSS_HEIGHT: 34,
     COLLISION_REPULSION: 0.3,
-    COLOR_BG_INNER: '#0d1430',
-    COLOR_BG_OUTER: '#070b1a',
-    COLOR_STRING: 'rgba(200,220,255,0.7)',
-    COLOR_BEAD_STROKE: 'rgba(25,45,90,0.7)',
-    COLOR_PIN: '#6be2ff',
+    COLOR_BG_INNER: '#ffffff',
+    COLOR_BG_OUTER: '#ffffff',
+    COLOR_STRING: 'rgba(45, 39, 20, 0.85)',
+    COLOR_BEAD_STROKE: 'rgba(78,47,23,0.85)',
+    COLOR_PIN: '#e5c07b',
     COLOR_DRAG: 'rgba(255,255,255,.9)',
-    COLOR_AVE: '#e8f0ff',
-    COLOR_PATER: '#cbd7ff',
-    COLOR_MEDAL: '#ffe6a8',
+    COLOR_AVE: '#d4a373',
+    COLOR_PATER: '#b07f49',
+    COLOR_MEDAL: '#d9b26d',
     COLOR_HIGHLIGHT: '#ff0000',
-    CROSS_STROKE: '#2a334d',
-    CROSS_GRAD_TOP: '#f2e6c9',
-    CROSS_GRAD_BOTTOM: '#d6b88a',
-    CROSS_EDGE_HI: '#ffffff',
+    CROSS_STROKE: '#7f4e24',
+    CROSS_GRAD_TOP: '#f2d4a9',
+    CROSS_GRAD_BOTTOM: '#b67f3c',
+    CROSS_EDGE_HI: '#fbe2c5',
     TOP_BOTTOM_MARGIN_RATIO: 0.05
   };
 
   const TYPE = { AVE:'AVE', PATER:'PATER', MEDAL:'MEDAL', CROSS:'CROSS' };
+  const WOOD_TONES = {
+    AVE: { light: '#f6dec0', mid: '#d49a60', dark: '#8a5425' },
+    PATER: { light: '#f0cfa2', mid: '#bc8041', dark: '#6f4119' },
+    MEDAL: { light: '#f8e3ad', mid: '#c99547', dark: '#7a4c1b' }
+  };
 
   class Node {
     constructor(x,y, kind=TYPE.CROSS, node_id='unknown', radiusOverrides){
@@ -97,6 +102,48 @@
       AVE: CFG.RADIUS_AVE, PATER: CFG.RADIUS_PATER, MEDAL: CFG.RADIUS_MEDAL
     });
     const crossSize = () => ({ w: CFG.CROSS_WIDTH, h: CFG.CROSS_HEIGHT });
+
+    function beadTone(kind){
+      if (kind === TYPE.PATER) return WOOD_TONES.PATER;
+      if (kind === TYPE.MEDAL) return WOOD_TONES.MEDAL;
+      return WOOD_TONES.AVE;
+    }
+
+    function createWoodGradient(x, y, radius, tone){
+      const grad = ctx.createRadialGradient(x - radius * 0.35, y - radius * 0.55, radius * 0.1, x, y, radius);
+      grad.addColorStop(0, tone.light);
+      grad.addColorStop(0.5, tone.mid);
+      grad.addColorStop(1, tone.dark);
+      return grad;
+    }
+
+    function beadFill(node, isHighlighted){
+      if (isHighlighted){
+        const glow = ctx.createRadialGradient(node.x, node.y, node.radius * 0.1, node.x, node.y, node.radius);
+        glow.addColorStop(0, '#ffd6d6');
+        glow.addColorStop(1, CFG.COLOR_HIGHLIGHT);
+        return glow;
+      }
+      const tone = beadTone(node.kind);
+      return createWoodGradient(node.x, node.y, node.radius, tone);
+    }
+
+    function beadGrain(node){
+      const tone = beadTone(node.kind);
+      ctx.save();
+      ctx.globalAlpha = 0.22;
+      ctx.strokeStyle = tone.light;
+      ctx.lineWidth = Math.max(0.4, node.radius * 0.12);
+      ctx.beginPath();
+      ctx.arc(node.x - node.radius * 0.2, node.y - node.radius * 0.25, node.radius * 0.65, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 0.18;
+      ctx.strokeStyle = tone.dark;
+      ctx.beginPath();
+      ctx.arc(node.x + node.radius * 0.15, node.y + node.radius * 0.2, node.radius * 0.4, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     function resize(){
       const cssW = Math.floor(canvas.clientWidth || canvas.width || REF.W);
@@ -175,13 +222,26 @@
       const grad=ctx.createLinearGradient(0,-topLen,0,botLen); grad.addColorStop(0, CFG.CROSS_GRAD_TOP); grad.addColorStop(1, CFG.CROSS_GRAD_BOTTOM);
       ctx.beginPath(); ctx.moveTo(-stem/2,-topLen); ctx.lineTo(stem/2,-topLen); ctx.lineTo(stem/2,-armThk/2); ctx.lineTo(armLen,-armThk/2); ctx.lineTo(armLen,armThk/2); ctx.lineTo(stem/2,armThk/2); ctx.lineTo(stem/2,botLen); ctx.lineTo(-stem/2,botLen); ctx.lineTo(-stem/2,armThk/2); ctx.lineTo(-armLen,armThk/2); ctx.lineTo(-armLen,-armThk/2); ctx.lineTo(-stem/2,-armThk/2); ctx.closePath();
       ctx.fillStyle = hi? CFG.COLOR_HIGHLIGHT : grad; ctx.strokeStyle = hi? CFG.COLOR_HIGHLIGHT : CFG.CROSS_STROKE; ctx.lineWidth=2; ctx.fill(); ctx.stroke();
-      ctx.save(); ctx.globalAlpha = hi? 0.45 : 0.2; ctx.strokeStyle = hi? CFG.COLOR_HIGHLIGHT : CFG.CROSS_EDGE_HI; ctx.lineWidth=1; ctx.stroke(); ctx.restore();
+      if (!hi){
+        ctx.save();
+        ctx.globalAlpha = 0.18; ctx.strokeStyle = CFG.CROSS_EDGE_HI; ctx.lineWidth = Math.max(1.2, stem*0.18);
+        ctx.beginPath(); ctx.moveTo(-armLen*0.85, -armThk*0.15); ctx.lineTo(armLen*0.85, -armThk*0.05); ctx.stroke();
+        ctx.globalAlpha = 0.14; ctx.strokeStyle = 'rgba(98,58,28,0.6)'; ctx.lineWidth = Math.max(1, stem*0.12);
+        ctx.beginPath(); ctx.moveTo(-stem*0.35, topLen*0.25); ctx.lineTo(stem*0.35, botLen*0.65); ctx.stroke();
+        ctx.restore();
+      } else {
+        ctx.save(); ctx.globalAlpha = 0.45; ctx.strokeStyle = CFG.COLOR_HIGHLIGHT; ctx.lineWidth=1; ctx.stroke(); ctx.restore();
+      }
       const dotR=Math.max(1, Math.min(2.2, stem*0.12)); ctx.beginPath(); ctx.arc(-armLen+2,0,dotR,0,Math.PI*2); ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fill(); ctx.beginPath(); ctx.arc(armLen-2,0,dotR,0,Math.PI*2); ctx.fill(); ctx.restore();
     }
 
     function draw(){
       ctx.clearRect(0,0,W,H);
-      //const grd = ctx.createRadialGradient(W*0.5,H*0.3, 10, W*0.5,H*0.3, Math.max(W,H)*0.9); grd.addColorStop(0, CFG.COLOR_BG_INNER); grd.addColorStop(1, CFG.COLOR_BG_OUTER); ctx.fillStyle=grd; ctx.fillRect(0,0,W,H);
+      const bg = ctx.createRadialGradient(W*0.5, H*0.35, Math.max(W,H)*0.05, W*0.5, H*0.4, Math.max(W,H)*0.8);
+      bg.addColorStop(0, CFG.COLOR_BG_INNER);
+      bg.addColorStop(1, CFG.COLOR_BG_OUTER);
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
       ctx.lineWidth=3; ctx.strokeStyle=CFG.COLOR_STRING; ctx.beginPath();
       const loop=collectLoop(); const medal=nodes[54];
       for(let i=0;i<loop.length-1;i++){ const a=loop[i], b=loop[i+1]; ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); }
@@ -190,7 +250,26 @@
       for(let i=loop.length;i<nodes.length-1;i++){ const a=nodes[i], b=nodes[i+1]; ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); }
       ctx.stroke();
 
-      for(const n of nodes){ let base = (n.kind===TYPE.PATER)? CFG.COLOR_PATER : (n.kind===TYPE.MEDAL)? CFG.COLOR_MEDAL : CFG.COLOR_AVE; if(highlightedId && n.node_id===highlightedId) base = CFG.COLOR_HIGHLIGHT; ctx.beginPath(); ctx.arc(n.x,n.y,n.radius,0,Math.PI*2); ctx.fillStyle=base; ctx.fill(); ctx.strokeStyle=CFG.COLOR_BEAD_STROKE; ctx.stroke(); if(n.pinned){ ctx.beginPath(); ctx.arc(n.x,n.y, Math.max(3,n.radius*0.55),0,Math.PI*2); ctx.strokeStyle=CFG.COLOR_PIN; ctx.lineWidth=2; ctx.stroke(); }}
+      for(const n of nodes){
+        const isHighlighted = (highlightedId && n.node_id===highlightedId);
+        ctx.beginPath();
+        ctx.arc(n.x,n.y,n.radius,0,Math.PI*2);
+        ctx.fillStyle = beadFill(n, !!isHighlighted);
+        ctx.fill();
+        ctx.strokeStyle = isHighlighted ? CFG.COLOR_HIGHLIGHT : CFG.COLOR_BEAD_STROKE;
+        ctx.lineWidth = Math.max(1, n.radius * 0.2);
+        ctx.stroke();
+        if(!isHighlighted && n.kind !== TYPE.CROSS){
+          beadGrain(n);
+        }
+        if(n.pinned){
+          ctx.beginPath();
+          ctx.arc(n.x,n.y, Math.max(3,n.radius*0.55),0,Math.PI*2);
+          ctx.strokeStyle=CFG.COLOR_PIN;
+          ctx.lineWidth=2;
+          ctx.stroke();
+        }
+      }
       const crossAnchor = nodes[nodes.length-1]; const crossHi = (crossAnchor.node_id===highlightedId); drawCross(crossAnchor.x, crossAnchor.y, crossSize(), crossHi);
       if (dragging){ const n=dragging.node; ctx.beginPath(); ctx.arc(n.x,n.y,n.radius+3,0,Math.PI*2); ctx.strokeStyle=CFG.COLOR_DRAG; ctx.lineWidth=2; ctx.stroke(); }
     }
