@@ -20,7 +20,7 @@
     <style>
       .prayer-layout {
         display: grid;
-        grid-template-rows: minmax(0, 6fr) minmax(0, 4fr);
+        grid-template-rows: minmax(0, 8fr) minmax(140px, 2fr);
         min-height: calc(100vh - 160px);
         gap: 1rem;
       }
@@ -36,6 +36,7 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
+        min-height: 140px;
       }
       .prayer-lyric-area {
         flex: 1 1 auto;
@@ -76,6 +77,7 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        gap: 0.5rem;
         white-space: nowrap;
         font-weight: 600;
         color: #212529;
@@ -122,11 +124,13 @@
         flex: 1 1 auto;
         min-height: 0;
         height: 100%;
-        grid-template-rows: minmax(0, 6fr) minmax(0, 4fr);
+        grid-template-rows: minmax(0, 8fr) minmax(140px, 2fr);
       }
-      body.prayer-mode .prayer-pane-top,
-      body.prayer-mode .prayer-pane-bottom {
+      body.prayer-mode .prayer-pane-top {
         min-height: 0;
+      }
+      body.prayer-mode .prayer-pane-bottom {
+        min-height: 140px;
       }
       body.prayer-mode #notice_div,
       body.prayer-mode #error_div,
