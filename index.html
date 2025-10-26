@@ -67,6 +67,30 @@
       .prayer-options-overlay #plannerOptions {
         border-top: none;
       }
+      .prayer-options-toggle-button {
+        background-color: #ffffff;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 0.75rem;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.08);
+        padding: 0.5rem 0.9rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        white-space: nowrap;
+        font-weight: 600;
+        color: #212529;
+      }
+      .prayer-options-toggle-button.active {
+        border-color: rgba(13, 110, 253, 0.6);
+        box-shadow: 0 0.5rem 1.5rem rgba(13, 110, 253, 0.15);
+      }
+      .prayer-options-toggle-button:focus-visible {
+        outline: 2px solid rgba(13, 110, 253, 0.6);
+        outline-offset: 2px;
+      }
+      #prayerOptionsOverlay .prayer-overlay-active .border-top {
+        border-top-width: 0;
+      }
       body.prayer-mode {
         overflow: hidden;
         height: 100dvh;
@@ -329,6 +353,13 @@
         <button type="button" class="btn btn-outline-secondary btn-sm position-absolute top-0 end-0 m-0 m-3" id="prayerExitButton" aria-label="플래너로 돌아가기">
           <i class="bi bi-x-lg"></i>
         </button>
+        <div class="position-absolute bottom-0 start-0 m-3 d-flex flex-column align-items-start gap-2">
+          <div id="prayerOptionsOverlay" class="prayer-options-overlay d-none" aria-hidden="true"></div>
+          <button type="button" class="btn prayer-options-toggle-button btn-sm d-inline-flex align-items-center gap-2" id="prayerOptionsToggleButton" aria-expanded="false" aria-controls="prayerOptionsOverlay">
+            <span class="fw-semibold">옵션</span>
+            <i class="bi bi-chevron-up" id="prayerOptionsToggleCaret" aria-hidden="true"></i>
+          </button>
+        </div>
         <button type="button" class="btn btn-primary position-absolute bottom-0 end-0 m-3" id="prayerNextButton">
           다음
         </button>
@@ -827,12 +858,59 @@ function reset_option_collapse_state() {
   $("#plannerOptionsToggleIcon").removeClass("bi-chevron-up").addClass("bi-chevron-down");
 }
 
+function set_prayer_options_toggle_state(expanded) {
+  const toggleButton = $("#prayerOptionsToggleButton");
+  if (!toggleButton.length) {
+    return;
+  }
+  toggleButton.toggleClass("active", !!expanded);
+  toggleButton.attr("aria-expanded", expanded ? "true" : "false");
+  const caret = $("#prayerOptionsToggleCaret");
+  if (caret.length) {
+    caret.toggleClass("bi-chevron-down", !!expanded);
+    caret.toggleClass("bi-chevron-up", !expanded);
+  }
+}
+
+function open_prayer_options_overlay() {
+  const overlay = $("#prayerOptionsOverlay");
+  if (!overlay.length) {
+    return;
+  }
+  overlay.removeClass("d-none").attr("aria-hidden", "false");
+  set_prayer_options_toggle_state(true);
+}
+
+function close_prayer_options_overlay() {
+  const overlay = $("#prayerOptionsOverlay");
+  if (!overlay.length) {
+    return;
+  }
+  overlay.addClass("d-none").attr("aria-hidden", "true");
+  set_prayer_options_toggle_state(false);
+}
+
 function move_options_to_overlay() {
   const overlay = $("#prayerOptionsOverlay");
   const wrapper = $("#plannerOptionsWrapper");
   if (overlay.length && wrapper.length) {
     overlay.append(wrapper);
-    reset_option_collapse_state();
+    wrapper.addClass("prayer-overlay-active");
+    const headerButton = wrapper.children("button[data-bs-toggle=\"collapse\"]");
+    if (headerButton.length) {
+      headerButton.addClass("d-none").attr("aria-hidden", "true");
+    }
+    const optionsCollapseElement = document.getElementById("plannerOptions");
+    if (optionsCollapseElement) {
+      let collapseInstance = bootstrap.Collapse.getInstance(optionsCollapseElement);
+      if (!collapseInstance) {
+        collapseInstance = new bootstrap.Collapse(optionsCollapseElement, { toggle: false });
+      }
+      collapseInstance.show();
+    } else {
+      $("#plannerOptions").addClass("show");
+    }
+    close_prayer_options_overlay();
   }
 }
 
@@ -840,8 +918,25 @@ function move_options_to_planner() {
   const home = $("#plannerOptionsHome");
   const wrapper = $("#plannerOptionsWrapper");
   if (home.length && wrapper.length) {
+    const optionsCollapseElement = document.getElementById("plannerOptions");
+    if (optionsCollapseElement) {
+      const collapseInstance = bootstrap.Collapse.getInstance(optionsCollapseElement);
+      if (collapseInstance) {
+        collapseInstance.hide();
+      } else {
+        $(optionsCollapseElement).removeClass("show");
+      }
+    } else {
+      $("#plannerOptions").removeClass("show");
+    }
+    const headerButton = wrapper.children("button[data-bs-toggle=\"collapse\"]");
+    if (headerButton.length) {
+      headerButton.removeClass("d-none").removeAttr("aria-hidden");
+    }
+    wrapper.removeClass("prayer-overlay-active");
     home.append(wrapper);
     reset_option_collapse_state();
+    close_prayer_options_overlay();
   }
 }
 
@@ -909,6 +1004,17 @@ $(document).ready(function() {
   $("#plannerStartButton").on("click", enter_prayer_view);
   $("#prayerExitButton").on("click", exit_prayer_view);
   $("#prayerNextButton").on("click", advance_prayer_step);
+  $("#prayerOptionsToggleButton").on("click", function() {
+    const overlay = $("#prayerOptionsOverlay");
+    if (!overlay.length || !overlay.children().length) {
+      return;
+    }
+    if (overlay.hasClass("d-none")) {
+      open_prayer_options_overlay();
+    } else {
+      close_prayer_options_overlay();
+    }
+  });
 
   render_prayer_step();
 
