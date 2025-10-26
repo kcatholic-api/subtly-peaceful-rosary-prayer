@@ -32,6 +32,17 @@
         flex-direction: column;
         overflow: hidden;
         min-height: 140px;
+        position: relative;
+      }
+      .prayer-line-button {
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        padding: 0;
       }
       .prayer-lyric-area {
         flex: 1 1 auto;
@@ -376,11 +387,13 @@
         </div>
       </div>
       <div class="prayer-pane-bottom">
+        <button type="button" class="btn btn-outline-secondary btn-sm prayer-line-button position-absolute top-0 end-0 m-3" id="prayerLinePrevButton" aria-label="이전 줄">▲</button>
         <div class="prayer-lyric-area px-4 py-4">
           <div class="prayer-step-body w-100">
             <p class="lead fw-semibold mb-0 text-center w-100" id="prayerCurrentStepContent">기도문이 여기에 표시됩니다.</p>
           </div>
         </div>
+        <button type="button" class="btn btn-primary btn-sm prayer-line-button position-absolute bottom-0 end-0 m-3" id="prayerLineNextButton" aria-label="다음 줄">▼</button>
       </div>
     </div>
   </div>
@@ -422,6 +435,7 @@ const settingsPrefix = "kcatolic-api-sprp-settings.";
 let voiceAutoPreference = false;
 let prayerSequence = [];
 let prayerSequenceIndex = 0;
+let prayerLineIndex = 0;
 let prayerStepIdCounter = 0;
 
 const rosaryPrayerTexts = {
@@ -658,27 +672,58 @@ function build_prayer_sequence() {
   });
 }
 
+function get_step_lines(step) {
+  if (!step) {
+    return [""];
+  }
+  const rawContent = typeof step.content === "string" ? step.content : "";
+  if (!step._lineCache || step._lineCache.source !== rawContent) {
+    const lines = rawContent
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    step._lineCache = {
+      source: rawContent,
+      lines: lines.length ? lines : [""]
+    };
+  }
+  return step._lineCache.lines;
+}
+
 function render_prayer_navigation_state() {
   const hasSequence = prayerSequence.length > 0;
-  const hasNext = prayerSequenceIndex < prayerSequence.length - 1;
-  const hasPrev = prayerSequenceIndex > 0;
+  const currentStep = hasSequence ? prayerSequence[prayerSequenceIndex] : null;
+  const stepLines = currentStep ? get_step_lines(currentStep) : [""];
+  const hasPrevLine = hasSequence && prayerLineIndex > 0;
+  const hasNextLine = hasSequence && prayerLineIndex < stepLines.length - 1;
+  const hasNextStep = hasSequence && prayerSequenceIndex < prayerSequence.length - 1;
+  const hasPrevStep = prayerSequenceIndex > 0;
   const nextButton = $("#prayerNextButton");
   const prevButton = $("#prayerPrevButton");
+  const linePrevButton = $("#prayerLinePrevButton");
+  const lineNextButton = $("#prayerLineNextButton");
   if (nextButton.length) {
     if (!hasSequence) {
       nextButton.prop("disabled", true).text("다음");
-    } else if (hasNext) {
+    } else if (hasNextStep) {
       nextButton.prop("disabled", false).text("다음");
     } else {
       nextButton.prop("disabled", true).text("완료");
     }
   }
   if (prevButton.length) {
-    if (!hasSequence || !hasPrev) {
+    prevButton.text("이전 단계");
+    if (!hasSequence || !hasPrevStep) {
       prevButton.prop("disabled", true);
     } else {
       prevButton.prop("disabled", false);
     }
+  }
+  if (linePrevButton.length) {
+    linePrevButton.prop("disabled", !hasSequence || !hasPrevLine);
+  }
+  if (lineNextButton.length) {
+    lineNextButton.prop("disabled", !hasSequence || !hasNextLine);
   }
 }
 
@@ -688,20 +733,48 @@ function render_prayer_step() {
     $("#prayerCurrentDecade").text("");
     $("#prayerCurrentStepTitle").text("기도문");
     $("#prayerCurrentStepContent").text("묵주 기도를 시작하려면 단수를 선택해 주세요.");
+    prayerLineIndex = 0;
     render_prayer_navigation_state();
     return;
   }
   const step = prayerSequence[prayerSequenceIndex];
+  const lines = get_step_lines(step);
+  if (prayerLineIndex >= lines.length) {
+    prayerLineIndex = 0;
+  }
+  const lineText = lines[Math.max(0, Math.min(prayerLineIndex, lines.length - 1))];
   $("#prayerCurrentMystery").text(step.mysteryTitle || "묵주 기도");
   $("#prayerCurrentDecade").text(step.decadeLabel || "");
   const titleText = step.progressLabel ? `${step.title} (${step.progressLabel})` : step.title;
   $("#prayerCurrentStepTitle").text(titleText);
-  $("#prayerCurrentStepContent").html(step.content.replace(/\n/g, "<br>"));
+  $("#prayerCurrentStepContent").text(lineText);
   if (step.stepId) {
     if(window.rosary)
       window.rosary.highlight_rosary_step(step.highlight || 'none');
   }
   render_prayer_navigation_state();
+}
+
+function advance_prayer_line() {
+  if (!prayerSequence.length) {
+    return;
+  }
+  const step = prayerSequence[prayerSequenceIndex];
+  const lines = get_step_lines(step);
+  if (prayerLineIndex < lines.length - 1) {
+    prayerLineIndex += 1;
+    render_prayer_step();
+  }
+}
+
+function retreat_prayer_line() {
+  if (!prayerSequence.length) {
+    return;
+  }
+  if (prayerLineIndex > 0) {
+    prayerLineIndex -= 1;
+    render_prayer_step();
+  }
 }
 
 function advance_prayer_step() {
@@ -710,6 +783,7 @@ function advance_prayer_step() {
   }
   if (prayerSequenceIndex < prayerSequence.length - 1) {
     prayerSequenceIndex += 1;
+    prayerLineIndex = 0;
     render_prayer_step();
   }
 }
@@ -720,6 +794,7 @@ function retreat_prayer_step() {
   }
   if (prayerSequenceIndex > 0) {
     prayerSequenceIndex -= 1;
+    prayerLineIndex = 0;
     render_prayer_step();
   }
 }
@@ -977,6 +1052,7 @@ function enter_prayer_view() {
 
   prayerSequence = build_prayer_sequence();
   prayerSequenceIndex = 0;
+  prayerLineIndex = 0;
   render_prayer_step();
   move_options_to_overlay();
   const wantsFullscreen = !!readSetting("option.fullscreen", false);
@@ -1002,6 +1078,7 @@ function enter_prayer_view() {
 function exit_prayer_view() {
   prayerSequence = [];
   prayerSequenceIndex = 0;
+  prayerLineIndex = 0;
   render_prayer_step();
   move_options_to_planner();
   $("body").removeClass("prayer-mode");
@@ -1043,6 +1120,8 @@ $(document).ready(function() {
   $("#prayerExitButton").on("click", exit_prayer_view);
   $("#prayerPrevButton").on("click", retreat_prayer_step);
   $("#prayerNextButton").on("click", advance_prayer_step);
+  $("#prayerLinePrevButton").on("click", retreat_prayer_line);
+  $("#prayerLineNextButton").on("click", advance_prayer_line);
   $("#rosaryLayoutResetButton").on("click", function() {
     if(window.rosary) {
       window.rosary.reset();
@@ -1071,13 +1150,19 @@ $(document).ready(function() {
     let handled = false;
     switch (event.key) {
       case "ArrowLeft":
-      case "ArrowUp":
         retreat_prayer_step();
         handled = true;
         break;
       case "ArrowRight":
-      case "ArrowDown":
         advance_prayer_step();
+        handled = true;
+        break;
+      case "ArrowUp":
+        retreat_prayer_line();
+        handled = true;
+        break;
+      case "ArrowDown":
+        advance_prayer_line();
         handled = true;
         break;
       case "Enter":
