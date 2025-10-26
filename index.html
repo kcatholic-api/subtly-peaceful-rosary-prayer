@@ -519,6 +519,8 @@ let horizontalSplitPreference = false;
 let rosaryLayoutRefreshHandle = null;
 let autoProgressEnabled = false;
 let autoProgressTimeoutHandle = null;
+const AUTO_PROGRESS_LINE_DELAY_MS = 0;
+const AUTO_PROGRESS_STEP_DELAY_MS = 100;
 const ttsState = {
   supported: typeof window !== "undefined" && typeof window.speechSynthesis !== "undefined" && typeof window.SpeechSynthesisUtterance !== "undefined",
   voices: [],
@@ -1217,12 +1219,12 @@ function auto_advance_after_tts() {
   if (lineByLineEnabled) {
     const lines = get_step_lines(step);
     if (prayerLineIndex < lines.length - 1) {
-      schedule(() => advance_prayer_line(), 420);
+      schedule(() => advance_prayer_line(), AUTO_PROGRESS_LINE_DELAY_MS);
       return;
     }
   }
   if (prayerSequenceIndex < prayerSequence.length - 1) {
-    schedule(() => advance_prayer_step(), 550);
+    schedule(() => advance_prayer_step(), AUTO_PROGRESS_STEP_DELAY_MS);
   }
 }
 
