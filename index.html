@@ -320,6 +320,10 @@
                 <div class="collapse" id="plannerOptions">
                   <div class="border-top px-3 pb-3 pt-3">
                     <div class="form-check form-switch">
+                      <input class="form-check-input" type="checkbox" role="switch" id="plannerOptionLineByLine">
+                      <label class="form-check-label" for="plannerOptionLineByLine">기도문 한줄 씩 보여주기</label>
+                    </div>
+                    <div class="form-check form-switch mt-2">
                       <input class="form-check-input" type="checkbox" role="switch" id="plannerOptionTts">
                       <label class="form-check-label" for="plannerOptionTts">TTS로 읽어 주기</label>
                     </div>
@@ -436,6 +440,9 @@ let voiceAutoPreference = false;
 let prayerSequence = [];
 let prayerSequenceIndex = 0;
 let prayerLineIndex = 0;
+let lineByLinePreference = true;
+let lineByLineEnabled = true;
+let ttsEnabled = false;
 let prayerStepIdCounter = 0;
 
 const rosaryPrayerTexts = {
@@ -690,6 +697,15 @@ function get_step_lines(step) {
   return step._lineCache.lines;
 }
 
+function sync_line_by_line_toggle() {
+  const toggle = $("#plannerOptionLineByLine");
+  if (!toggle.length) {
+    return;
+  }
+  toggle.prop("checked", lineByLineEnabled);
+  toggle.prop("disabled", ttsEnabled);
+}
+
 function render_prayer_navigation_state() {
   const hasSequence = prayerSequence.length > 0;
   const currentStep = hasSequence ? prayerSequence[prayerSequenceIndex] : null;
@@ -702,6 +718,8 @@ function render_prayer_navigation_state() {
   const prevButton = $("#prayerPrevButton");
   const linePrevButton = $("#prayerLinePrevButton");
   const lineNextButton = $("#prayerLineNextButton");
+  sync_line_by_line_toggle();
+  const hideLineControls = !lineByLineEnabled;
   if (nextButton.length) {
     if (!hasSequence) {
       nextButton.prop("disabled", true).text("다음");
@@ -720,10 +738,12 @@ function render_prayer_navigation_state() {
     }
   }
   if (linePrevButton.length) {
-    linePrevButton.prop("disabled", !hasSequence || !hasPrevLine);
+    linePrevButton.toggleClass("d-none", hideLineControls);
+    linePrevButton.prop("disabled", hideLineControls || !hasSequence || !hasPrevLine);
   }
   if (lineNextButton.length) {
-    lineNextButton.prop("disabled", !hasSequence || !hasNextLine);
+    lineNextButton.toggleClass("d-none", hideLineControls);
+    lineNextButton.prop("disabled", hideLineControls || !hasSequence || !hasNextLine);
   }
 }
 
@@ -738,16 +758,22 @@ function render_prayer_step() {
     return;
   }
   const step = prayerSequence[prayerSequenceIndex];
+  const rawContent = typeof step.content === "string" ? step.content : "";
   const lines = get_step_lines(step);
-  if (prayerLineIndex >= lines.length) {
-    prayerLineIndex = 0;
-  }
-  const lineText = lines[Math.max(0, Math.min(prayerLineIndex, lines.length - 1))];
   $("#prayerCurrentMystery").text(step.mysteryTitle || "묵주 기도");
   $("#prayerCurrentDecade").text(step.decadeLabel || "");
   const titleText = step.progressLabel ? `${step.title} (${step.progressLabel})` : step.title;
   $("#prayerCurrentStepTitle").text(titleText);
-  $("#prayerCurrentStepContent").text(lineText);
+  if (lineByLineEnabled) {
+    if (prayerLineIndex >= lines.length) {
+      prayerLineIndex = 0;
+    }
+    const lineText = lines[Math.max(0, Math.min(prayerLineIndex, lines.length - 1))];
+    $("#prayerCurrentStepContent").text(lineText);
+  } else {
+    prayerLineIndex = 0;
+    $("#prayerCurrentStepContent").html(rawContent.replace(/\r?\n/g, "<br>"));
+  }
   if (step.stepId) {
     if(window.rosary)
       window.rosary.highlight_rosary_step(step.highlight || 'none');
@@ -755,7 +781,48 @@ function render_prayer_step() {
   render_prayer_navigation_state();
 }
 
+function apply_line_by_line_effects(options = {}) {
+  const { triggerRender = true, allowAutoAdjust = true } = options;
+  const prevEnabled = lineByLineEnabled;
+  lineByLineEnabled = ttsEnabled || lineByLinePreference;
+  sync_line_by_line_toggle();
+  const linePrevButton = $("#prayerLinePrevButton");
+  const lineNextButton = $("#prayerLineNextButton");
+  const hideLineControls = !lineByLineEnabled;
+  if (linePrevButton.length) {
+    linePrevButton.toggleClass("d-none", hideLineControls);
+    if (hideLineControls) {
+      linePrevButton.prop("disabled", true);
+    }
+  }
+  if (lineNextButton.length) {
+    lineNextButton.toggleClass("d-none", hideLineControls);
+    if (hideLineControls) {
+      lineNextButton.prop("disabled", true);
+    }
+  }
+  if (hideLineControls) {
+    prayerLineIndex = 0;
+  }
+  if (allowAutoAdjust && !prevEnabled && lineByLineEnabled) {
+    const autoProgressCheckbox = $("#plannerOptionAutoProgress");
+    if (autoProgressCheckbox.length && !autoProgressCheckbox.is(":checked")) {
+      autoProgressCheckbox.prop("checked", true);
+      writeSetting("option.autoProgress", true);
+    }
+  }
+  update_voice_auto_option();
+  if (triggerRender) {
+    render_prayer_step();
+  } else {
+    render_prayer_navigation_state();
+  }
+}
+
 function advance_prayer_line() {
+  if (!lineByLineEnabled) {
+    return;
+  }
   if (!prayerSequence.length) {
     return;
   }
@@ -768,6 +835,9 @@ function advance_prayer_line() {
 }
 
 function retreat_prayer_line() {
+  if (!lineByLineEnabled) {
+    return;
+  }
   if (!prayerSequence.length) {
     return;
   }
@@ -892,11 +962,33 @@ function update_voice_auto_option() {
 }
 
 function load_option_settings() {
-  const ttsPref = !!readSetting("option.tts", false);
-  $("#plannerOptionTts").prop("checked", ttsPref);
+  lineByLinePreference = !!readSetting("option.lineByLine", true);
+  lineByLineEnabled = lineByLinePreference;
 
-  const autoPref = !!readSetting("option.autoProgress", false);
+  ttsEnabled = !!readSetting("option.tts", false);
+  $("#plannerOptionTts").prop("checked", ttsEnabled);
+
+  let autoStoredRaw = null;
+  try {
+    autoStoredRaw = localStorage.getItem(settingsPrefix + "option.autoProgress");
+  } catch (error) {
+    autoStoredRaw = null;
+  }
+  const autoPrefOriginal = !!readSetting("option.autoProgress", false);
+  let autoPref = autoPrefOriginal;
+  let persistAutoPref = false;
+  if (autoStoredRaw === null && (lineByLinePreference || ttsEnabled)) {
+    autoPref = true;
+    persistAutoPref = true;
+  }
+  if (ttsEnabled && !autoPref) {
+    autoPref = true;
+    persistAutoPref = true;
+  }
   $("#plannerOptionAutoProgress").prop("checked", autoPref);
+  if (persistAutoPref && autoPref !== autoPrefOriginal) {
+    writeSetting("option.autoProgress", autoPref);
+  }
 
   voiceAutoPreference = !!readSetting("option.voiceAuto", false);
 
@@ -907,6 +999,7 @@ function load_option_settings() {
     $("#plannerOptionFullscreen").prop("checked", fullscreenPref);
   }
 
+  apply_line_by_line_effects({ triggerRender: false, allowAutoAdjust: false });
   update_voice_auto_option();
 }
 
@@ -1099,12 +1192,19 @@ $(document).ready(function() {
   update_planner_start_button();
   update_mystery_count_states();
   $("#plannerOptionTts").on("change", function() {
-    writeSetting("option.tts", $(this).is(":checked"));
+    ttsEnabled = $(this).is(":checked");
+    writeSetting("option.tts", ttsEnabled);
+    apply_line_by_line_effects();
   });
   $("#plannerOptionAutoProgress").on("change", function() {
     const enabled = $(this).is(":checked");
     writeSetting("option.autoProgress", enabled);
     update_voice_auto_option();
+  });
+  $("#plannerOptionLineByLine").on("change", function() {
+    lineByLinePreference = $(this).is(":checked");
+    writeSetting("option.lineByLine", lineByLinePreference);
+    apply_line_by_line_effects();
   });
   $("#plannerOptionVoiceAuto").on("change", function() {
     voiceAutoPreference = $(this).is(":checked");
@@ -1158,12 +1258,16 @@ $(document).ready(function() {
         handled = true;
         break;
       case "ArrowUp":
-        retreat_prayer_line();
-        handled = true;
+        if (lineByLineEnabled) {
+          retreat_prayer_line();
+          handled = true;
+        }
         break;
       case "ArrowDown":
-        advance_prayer_line();
-        handled = true;
+        if (lineByLineEnabled) {
+          advance_prayer_line();
+          handled = true;
+        }
         break;
       case "Enter":
         if (window.rosary && typeof window.rosary.reset === "function") {
