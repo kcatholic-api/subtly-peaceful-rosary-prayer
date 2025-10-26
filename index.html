@@ -100,24 +100,18 @@
         --prayer-karaoke-transition: 0.18s;
         --prayer-karaoke-highlight: #0d6efd;
         --prayer-karaoke-base: #212529;
-        background-image: linear-gradient(
-          to right,
-          var(--prayer-karaoke-highlight) 0%,
-          var(--prayer-karaoke-highlight) var(--prayer-karaoke-progress),
-          var(--prayer-karaoke-base) var(--prayer-karaoke-progress),
-          var(--prayer-karaoke-base) 100%
-        );
-        background-repeat: no-repeat;
-        background-size: 100% 100%;
-        background-position: left top;
-        color: transparent;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        -webkit-background-clip: text;
-        transition: background var(--prayer-karaoke-transition, 0.18s) linear;
+        color: var(--prayer-karaoke-base);
       }
       .prayer-line-current.karaoke-armed {
         --prayer-karaoke-base: rgba(33, 37, 41, 0.35);
+      }
+      .prayer-line-current .karaoke-char {
+        color: var(--prayer-karaoke-base);
+        transition: color var(--prayer-karaoke-transition, 0.18s) linear;
+        white-space: inherit;
+      }
+      .prayer-line-current .karaoke-char.karaoke-char-highlighted {
+        color: var(--prayer-karaoke-highlight);
       }
       .prayer-line-adjacent {
         color: rgba(108, 117, 125, 0.6);
@@ -843,15 +837,135 @@ function render_prayer_navigation_state() {
 }
 
 function create_prayer_line_element(text, role = "adjacent") {
-  const safeText = typeof text === "string" ? text : "";
-  const line = $("<div>").addClass("prayer-line").attr("data-text-length", safeText.length);
+  const safeText = typeof text === "string" ? text.replace(/\r\n/g, "\n") : "";
+  const line = $("<div>").addClass("prayer-line");
   if (role === "current") {
     line.addClass("prayer-line-current");
-    line.text(safeText);
+    build_karaoke_markup(line, safeText);
   } else {
     line.addClass("prayer-line-adjacent").text(safeText);
+    line.attr("data-text-length", safeText.length);
   }
   return line;
+}
+
+function build_karaoke_markup(line, text) {
+  if (!line || !line.length) {
+    return [];
+  }
+  const element = line.get(0);
+  if (!element) {
+    return [];
+  }
+  const safeText = typeof text === "string" ? text.replace(/\r\n/g, "\n") : "";
+  const fragment = document.createDocumentFragment();
+  const graphemes = Array.from(safeText);
+  const charNodes = [];
+  line.empty();
+  graphemes.forEach((char) => {
+    if (char === "\n") {
+      fragment.appendChild(document.createElement("br"));
+      return;
+    }
+    const span = document.createElement("span");
+    span.className = "karaoke-char";
+    span.textContent = char;
+    fragment.appendChild(span);
+    charNodes.push(span);
+  });
+  element.appendChild(fragment);
+  line.attr("data-raw-text", safeText);
+  line.attr("data-text-length", charNodes.length);
+  line.data("karaokeChars", charNodes);
+  line.data("karaokeThresholds", compute_karaoke_thresholds(safeText, charNodes));
+  line.data("karaokeHighlightedCount", 0);
+  return charNodes;
+}
+
+function ensure_karaoke_markup(line) {
+  if (!line || !line.length) {
+    return [];
+  }
+  const existing = line.data("karaokeChars");
+  if (Array.isArray(existing)) {
+    const thresholds = line.data("karaokeThresholds");
+    if (!Array.isArray(thresholds) || thresholds.length !== existing.length) {
+      const fallbackText = (line.attr("data-raw-text") || line.text() || "").replace(/\r\n/g, "\n");
+      line.data("karaokeThresholds", compute_karaoke_thresholds(fallbackText, existing));
+    }
+    return existing;
+  }
+  const fallbackText = (line.attr("data-raw-text") || line.text() || "").replace(/\r\n/g, "\n");
+  return build_karaoke_markup(line, fallbackText);
+}
+
+function reset_karaoke_highlight(line) {
+  if (!line || !line.length) {
+    return;
+  }
+  const chars = ensure_karaoke_markup(line);
+  for (let i = 0; i < chars.length; i += 1) {
+    const node = chars[i];
+    if (node && node.classList) {
+      node.classList.remove("karaoke-char-highlighted");
+    }
+  }
+  line.data("karaokeHighlightedCount", 0);
+}
+
+function compute_karaoke_thresholds(originalText, charNodes) {
+  if (!Array.isArray(charNodes) || !charNodes.length) {
+    return [];
+  }
+  const sanitized = sanitize_prayer_text_for_tts(originalText || "");
+  const sanitizedChars = Array.from(sanitized);
+  const sanitizedLength = sanitizedChars.length;
+  if (!sanitizedLength) {
+    return new Array(charNodes.length).fill(1);
+  }
+  const thresholds = new Array(charNodes.length).fill(1);
+  const removalPattern = /[╋◎○●]/;
+  const isWhitespace = (char) => /\s/.test(char);
+  let nodeIndex = 0;
+  sanitizedChars.forEach((sChar, sIndex) => {
+    if (sChar === " ") {
+      while (nodeIndex < charNodes.length) {
+        const node = charNodes[nodeIndex];
+        const nodeChar = node && node.textContent ? node.textContent : "";
+        if (!isWhitespace(nodeChar)) {
+          break;
+        }
+        thresholds[nodeIndex] = (sIndex + 1) / sanitizedLength;
+        nodeIndex += 1;
+      }
+      return;
+    }
+    while (nodeIndex < charNodes.length) {
+      const node = charNodes[nodeIndex];
+      const nodeChar = node && node.textContent ? node.textContent : "";
+      if (isWhitespace(nodeChar)) {
+        thresholds[nodeIndex] = sanitizedLength ? sIndex / sanitizedLength : 0;
+        nodeIndex += 1;
+        continue;
+      }
+      if (nodeChar === sChar) {
+        thresholds[nodeIndex] = (sIndex + 1) / sanitizedLength;
+        nodeIndex += 1;
+        break;
+      }
+      if (removalPattern.test(nodeChar)) {
+        thresholds[nodeIndex] = sanitizedLength ? sIndex / sanitizedLength : 0;
+      } else {
+        thresholds[nodeIndex] = (sIndex + 1) / sanitizedLength;
+      }
+      nodeIndex += 1;
+    }
+  });
+  while (nodeIndex < charNodes.length) {
+    thresholds[nodeIndex] = 1;
+    nodeIndex += 1;
+  }
+  return thresholds;
 }
 
 function get_current_karaoke_element() {
@@ -861,9 +975,11 @@ function get_current_karaoke_element() {
 function reset_karaoke_visual_state() {
   const lines = $("#prayerCurrentStepContent .prayer-line-current");
   lines.each(function() {
+    const $line = $(this);
     this.style.setProperty("--prayer-karaoke-progress", "0%");
     this.style.removeProperty("--prayer-karaoke-transition");
     this.classList.remove("karaoke-armed", "karaoke-active", "karaoke-complete");
+    reset_karaoke_highlight($line);
   });
   if (ttsState) {
     ttsState.karaokeElement = lines.length ? lines.eq(0) : null;
@@ -1101,10 +1217,12 @@ function prepare_karaoke_element(line, options = {}) {
     return;
   }
   const { reset = false } = options;
+  ensure_karaoke_markup(line);
   if (reset) {
     line.removeClass("karaoke-armed karaoke-active karaoke-complete");
     line.get(0).style.setProperty("--prayer-karaoke-progress", "0%");
     line.get(0).style.removeProperty("--prayer-karaoke-transition");
+    reset_karaoke_highlight(line);
   }
 }
 
@@ -1113,7 +1231,38 @@ function set_karaoke_progress(line, ratio) {
     return;
   }
   const element = line.get(0);
+  const chars = ensure_karaoke_markup(line);
   const clamped = Math.max(0, Math.min(1, ratio));
+  const total = chars.length;
+  const previous = line.data("karaokeHighlightedCount") || 0;
+  let target = 0;
+  const thresholds = line.data("karaokeThresholds");
+  if (total && Array.isArray(thresholds) && thresholds.length === total) {
+    const epsilon = 0.00001;
+    while (target < total && clamped + epsilon >= thresholds[target]) {
+      target += 1;
+    }
+  } else {
+    target = total ? Math.round(clamped * total) : 0;
+  }
+  if (target !== previous) {
+    if (target > previous) {
+      for (let i = previous; i < target; i += 1) {
+        const node = chars[i];
+        if (node && node.classList) {
+          node.classList.add("karaoke-char-highlighted");
+        }
+      }
+    } else {
+      for (let i = target; i < previous; i += 1) {
+        const node = chars[i];
+        if (node && node.classList) {
+          node.classList.remove("karaoke-char-highlighted");
+        }
+      }
+    }
+    line.data("karaokeHighlightedCount", target);
+  }
   element.style.setProperty("--prayer-karaoke-progress", `${(clamped * 100).toFixed(2)}%`);
 }
 
@@ -1175,15 +1324,18 @@ function finalize_karaoke(completed) {
   } else {
     line.removeClass("karaoke-active karaoke-armed karaoke-complete");
     line.get(0).style.setProperty("--prayer-karaoke-progress", "0%");
+    reset_karaoke_highlight(line);
   }
 }
 
 function clear_karaoke_visual() {
   const currentLines = $("#prayerCurrentStepContent .prayer-line-current");
   currentLines.each(function() {
+    const $line = $(this);
     this.style.setProperty("--prayer-karaoke-progress", "0%");
     this.style.removeProperty("--prayer-karaoke-transition");
     this.classList.remove("karaoke-armed", "karaoke-active", "karaoke-complete");
+    reset_karaoke_highlight($line);
   });
   ttsState.karaokeElement = currentLines.length ? currentLines.eq(0) : null;
 }
