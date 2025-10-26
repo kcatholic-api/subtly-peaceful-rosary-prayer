@@ -89,13 +89,40 @@
       .prayer-line {
         margin: 0;
         line-height: 1.4;
+        white-space: pre-wrap;
+        max-width: 100%;
       }
       .prayer-line-current {
-        color: #212529;
+        position: relative;
+        display: inline-block;
+        max-width: 100%;
+        --prayer-karaoke-progress: 0%;
+        --prayer-karaoke-transition: 0.18s;
+        --prayer-karaoke-highlight: #0d6efd;
+        --prayer-karaoke-base: #212529;
+        background-image: linear-gradient(
+          to right,
+          var(--prayer-karaoke-highlight) 0%,
+          var(--prayer-karaoke-highlight) var(--prayer-karaoke-progress),
+          var(--prayer-karaoke-base) var(--prayer-karaoke-progress),
+          var(--prayer-karaoke-base) 100%
+        );
+        background-repeat: no-repeat;
+        background-size: 100% 100%;
+        background-position: left top;
+        color: transparent;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        -webkit-background-clip: text;
+        transition: background var(--prayer-karaoke-transition, 0.18s) linear;
+      }
+      .prayer-line-current.karaoke-armed {
+        --prayer-karaoke-base: rgba(33, 37, 41, 0.35);
       }
       .prayer-line-adjacent {
         color: rgba(108, 117, 125, 0.6);
         font-size: 0.9rem;
+        white-space: pre-wrap;
       }
       .prayer-options-overlay {
         max-width: 320px;
@@ -490,6 +517,26 @@ let ttsEnabled = false;
 let prayerStepIdCounter = 0;
 let horizontalSplitPreference = false;
 let rosaryLayoutRefreshHandle = null;
+let autoProgressEnabled = false;
+let autoProgressTimeoutHandle = null;
+const ttsState = {
+  supported: typeof window !== "undefined" && typeof window.speechSynthesis !== "undefined" && typeof window.SpeechSynthesisUtterance !== "undefined",
+  voices: [],
+  preferredVoice: null,
+  utterance: null,
+  currentToken: null,
+  karaokeElement: null,
+  progressRAF: null,
+  textLength: 0,
+  startTime: 0,
+  lastBoundaryTime: 0,
+  lastBoundaryIndex: 0,
+  charsPerSecond: 12,
+  expectingCancel: false,
+  isChrome: false,
+  pendingRequest: null
+};
+let ttsSupportAlerted = false;
 
 const rosaryPrayerTexts = {
   apostlesCreed: "╋ 전능하신 천주 성부, ◎ 천지의 창조주를 저는 믿나이다.\n그 외아들 우리 주 예수 그리스도님,\n성령으로 인하여 동정 마리아께 잉태되어 나시고,\n본시오 빌라도 통치 아래에서 고난을 받으시고,\n십자가에 못 박혀 돌아가시고 묻히셨으며,\n저승에 가시어 사흗날에 죽은 이들 가운데서 부활하시고,\n하늘에 올라 전능하신 천주 성부 오른편에 앉아 계시며,\n그리로부터 산 이와 죽은 이를 심판하러 오시리라 믿나이다.\n성령을 믿으며,\n거룩하고 보편된 교회와 모든 성인의 통공을 믿으며,\n죄의 용서와 육신의 부활을 믿으며,\n영원한 삶을 믿나이다. 아멘.",
@@ -554,7 +601,7 @@ function create_intro_steps() {
       mysteryTitle: "묵주 기도",
       decadeLabel: "",
       title: "준비",
-      content: "성호경 및 십자가의 예수님 발에 입맞춤",
+      content: "(성호경 및 십자가의 예수님 발에 입맞춤)",
       highlight: 'cross'
     },
     {
@@ -631,7 +678,7 @@ function create_concluding_steps() {
       mysteryTitle: "묵주 기도",
       decadeLabel: "",
       title: "마무리",
-      content: "성호경 및 십자가의 예수님 발에 입맞춤",
+      content: "(성호경 및 십자가의 예수님 발에 입맞춤)",
       highlight: 'cross'
     }
   ];
@@ -793,24 +840,521 @@ function render_prayer_navigation_state() {
   }
 }
 
+function create_prayer_line_element(text, role = "adjacent") {
+  const safeText = typeof text === "string" ? text : "";
+  const line = $("<div>").addClass("prayer-line").attr("data-text-length", safeText.length);
+  if (role === "current") {
+    line.addClass("prayer-line-current");
+    line.text(safeText);
+  } else {
+    line.addClass("prayer-line-adjacent").text(safeText);
+  }
+  return line;
+}
+
+function get_current_karaoke_element() {
+  return $("#prayerCurrentStepContent .prayer-line-current").first();
+}
+
+function reset_karaoke_visual_state() {
+  const lines = $("#prayerCurrentStepContent .prayer-line-current");
+  lines.each(function() {
+    this.style.setProperty("--prayer-karaoke-progress", "0%");
+    this.style.removeProperty("--prayer-karaoke-transition");
+    this.classList.remove("karaoke-armed", "karaoke-active", "karaoke-complete");
+  });
+  if (ttsState) {
+    ttsState.karaokeElement = lines.length ? lines.eq(0) : null;
+  }
+}
+
+function get_current_prayer_text_for_tts() {
+  if (!prayerSequence.length) {
+    return "";
+  }
+  const step = prayerSequence[prayerSequenceIndex];
+  if (!step) {
+    return "";
+  }
+  const rawContent = typeof step.content === "string" ? step.content : "";
+  if (lineByLineEnabled) {
+    const lines = get_step_lines(step);
+    if (!lines.length) {
+      return rawContent;
+    }
+    const currentIndex = Math.max(0, Math.min(prayerLineIndex, lines.length - 1));
+    return lines[currentIndex] || "";
+  }
+  return rawContent;
+}
+
+function sanitize_prayer_text_for_tts(rawText) {
+  if (typeof rawText !== "string") {
+    return "";
+  }
+  return rawText.replace(/[╋◎○●]/g, "").replace(/\s+/g, " ").trim();
+}
+function is_parenthetical_line(rawText) {
+  if (typeof rawText !== "string") {
+    return false;
+  }
+  const trimmed = rawText.trim();
+  if (!trimmed.startsWith("(") || !trimmed.endsWith(")")) {
+    return false;
+  }
+  const inner = trimmed.slice(1, -1).trim();
+  return inner.length > 0;
+}
+
+
+function get_current_tts_token() {
+  if (!prayerSequence.length) {
+    return "idle";
+  }
+  const step = prayerSequence[prayerSequenceIndex];
+  if (!step) {
+    return "idle";
+  }
+  const stepId = step.stepId || `step-${prayerSequenceIndex}`;
+  const lineToken = lineByLineEnabled ? `line-${prayerLineIndex}` : "full";
+  return `${stepId}:${lineToken}`;
+}
+
+function handle_tts_after_render() {
+  clear_auto_progress_timer();
+  if (!ttsEnabled) {
+    stop_tts({ cancelSpeech: true, resetKaraoke: true });
+    ttsState.currentToken = null;
+    return;
+  }
+  if (!$("body").hasClass("prayer-mode")) {
+    stop_tts({ cancelSpeech: true, resetKaraoke: true });
+    ttsState.currentToken = null;
+    return;
+  }
+  if (!ttsState.supported) {
+    if (!ttsSupportAlerted) {
+      show_tts_support_warning();
+    }
+    return;
+  }
+  const token = get_current_tts_token();
+  const rawText = get_current_prayer_text_for_tts();
+  if (is_parenthetical_line(rawText)) {
+    stop_tts({ cancelSpeech: true, resetKaraoke: true });
+    ttsState.currentToken = null;
+    schedule_parenthetical_step_skip();
+    return;
+  }
+  const text = sanitize_prayer_text_for_tts(rawText);
+  if (!text) {
+    stop_tts({ cancelSpeech: true, resetKaraoke: true });
+    ttsState.currentToken = null;
+    return;
+  }
+  const currentLine = get_current_karaoke_element();
+  if (currentLine.length) {
+    ttsState.karaokeElement = currentLine;
+  }
+  if (ttsState.currentToken === token && typeof window !== "undefined" && window.speechSynthesis && window.speechSynthesis.speaking) {
+    return;
+  }
+  ttsState.currentToken = token;
+  stop_tts({ cancelSpeech: true, resetKaraoke: true });
+  start_tts_for_text(text, token);
+}
+
+function start_tts_for_text(text, token) {
+  if (!ttsState.supported) {
+    return;
+  }
+  const cleanText = (text || "").trim();
+  if (!cleanText) {
+    return;
+  }
+  const voice = get_preferred_tts_voice();
+  if (!voice && (!ttsState.voices || !ttsState.voices.length)) {
+    ttsState.pendingRequest = { text: cleanText, token: token || null };
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.getVoices();
+    }
+    return;
+  }
+  ttsState.pendingRequest = null;
+  const utterance = new SpeechSynthesisUtterance(cleanText);
+  utterance.lang = "ko-KR";
+  if (voice) {
+    utterance.voice = voice;
+  }
+  utterance.rate = 1;
+  utterance.pitch = 1;
+  utterance.onstart = handle_tts_start;
+  utterance.onend = handle_tts_end;
+  utterance.onerror = handle_tts_error;
+  utterance.onboundary = handle_tts_boundary;
+  ttsState.utterance = utterance;
+  ttsState.textLength = cleanText.length;
+  ttsState.expectingCancel = false;
+  if (typeof window !== "undefined" && window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+    window.setTimeout(() => {
+      if (window.speechSynthesis) {
+        try {
+          window.speechSynthesis.speak(utterance);
+        } catch (error) {
+          console.warn("TTS 실행에 실패했습니다.", error);
+        }
+      }
+    }, 0);
+  }
+}
+
+function stop_tts(options = {}) {
+  const { cancelSpeech = false, resetKaraoke = false } = options;
+  if (resetKaraoke) {
+    clear_karaoke_visual();
+  }
+  clear_auto_progress_timer();
+  if (!ttsState.supported) {
+    return;
+  }
+  stop_karaoke_loop();
+  if (ttsState.utterance) {
+    ttsState.utterance.onstart = null;
+    ttsState.utterance.onend = null;
+    ttsState.utterance.onerror = null;
+    ttsState.utterance.onboundary = null;
+    ttsState.utterance = null;
+  }
+  if (cancelSpeech && typeof window !== "undefined" && window.speechSynthesis) {
+    if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+      ttsState.expectingCancel = true;
+      window.speechSynthesis.cancel();
+    }
+  }
+}
+
+function handle_tts_start() {
+  clear_auto_progress_timer();
+  const line = get_current_karaoke_element();
+  if (line.length) {
+    ttsState.karaokeElement = line;
+    prepare_karaoke_element(line, { reset: true });
+    line.addClass("karaoke-armed");
+    set_karaoke_progress(line, 0);
+  }
+  ttsState.startTime = performance.now();
+  ttsState.lastBoundaryTime = ttsState.startTime;
+  ttsState.lastBoundaryIndex = 0;
+  ttsState.charsPerSecond = Math.max(6, Math.min(18, ttsState.textLength / 3 || 12));
+  start_karaoke_loop();
+}
+
+function handle_tts_end() {
+  const completed = !ttsState.expectingCancel;
+  finalize_karaoke(completed);
+  stop_karaoke_loop();
+  ttsState.utterance = null;
+  ttsState.expectingCancel = false;
+  if (ttsState.pendingRequest) {
+    const pending = { ...ttsState.pendingRequest };
+    ttsState.pendingRequest = null;
+    if (!pending.token || pending.token === ttsState.currentToken) {
+      start_tts_for_text(pending.text, pending.token || ttsState.currentToken);
+    }
+  }
+  if (completed) {
+    auto_advance_after_tts();
+  }
+}
+
+function handle_tts_error() {
+  finalize_karaoke(false);
+  stop_karaoke_loop();
+  ttsState.utterance = null;
+  ttsState.expectingCancel = false;
+}
+
+function handle_tts_boundary(event) {
+  if (!event || typeof event.charIndex !== "number") {
+    return;
+  }
+  const now = performance.now();
+  const previousIndex = ttsState.lastBoundaryIndex;
+  const newIndex = Math.max(event.charIndex, previousIndex);
+  const deltaChars = newIndex - previousIndex;
+  const deltaTime = (now - ttsState.lastBoundaryTime) / 1000;
+  if (deltaChars > 0 && deltaTime > 0.01) {
+    const cps = deltaChars / deltaTime;
+    ttsState.charsPerSecond = (ttsState.charsPerSecond * 0.6) + (cps * 0.4);
+  }
+  ttsState.lastBoundaryIndex = newIndex;
+  ttsState.lastBoundaryTime = now;
+  const ratio = ttsState.textLength > 0 ? Math.min(newIndex / ttsState.textLength, 1) : 1;
+  apply_karaoke_progress(ratio, 0.12);
+}
+
+function prepare_karaoke_element(line, options = {}) {
+  if (!line || !line.length) {
+    return;
+  }
+  const { reset = false } = options;
+  if (reset) {
+    line.removeClass("karaoke-armed karaoke-active karaoke-complete");
+    line.get(0).style.setProperty("--prayer-karaoke-progress", "0%");
+    line.get(0).style.removeProperty("--prayer-karaoke-transition");
+  }
+}
+
+function set_karaoke_progress(line, ratio) {
+  if (!line || !line.length) {
+    return;
+  }
+  const element = line.get(0);
+  const clamped = Math.max(0, Math.min(1, ratio));
+  element.style.setProperty("--prayer-karaoke-progress", `${(clamped * 100).toFixed(2)}%`);
+}
+
+function apply_karaoke_progress(ratio, transitionSeconds) {
+  const line = ttsState.karaokeElement;
+  if (!line || !line.length) {
+    return;
+  }
+  if (typeof transitionSeconds === "number") {
+    line.get(0).style.setProperty("--prayer-karaoke-transition", `${transitionSeconds}s`);
+  }
+  set_karaoke_progress(line, ratio);
+}
+
+function start_karaoke_loop() {
+  stop_karaoke_loop();
+  if (!ttsState.karaokeElement || !ttsState.karaokeElement.length) {
+    return;
+  }
+  ttsState.karaokeElement.addClass("karaoke-active");
+  const tick = () => {
+    const line = ttsState.karaokeElement;
+    if (!line || !line.length) {
+      ttsState.progressRAF = null;
+      return;
+    }
+    const now = performance.now();
+    const elapsed = (now - ttsState.lastBoundaryTime) / 1000;
+    const projectedIndex = ttsState.lastBoundaryIndex + elapsed * ttsState.charsPerSecond;
+    const ratio = ttsState.textLength > 0 ? Math.min(projectedIndex / ttsState.textLength, 1) : 1;
+    apply_karaoke_progress(ratio, 0.1);
+    if (ratio >= 1) {
+      ttsState.progressRAF = null;
+      return;
+    }
+    ttsState.progressRAF = requestAnimationFrame(tick);
+  };
+  ttsState.progressRAF = requestAnimationFrame(tick);
+}
+
+function stop_karaoke_loop() {
+  if (ttsState.progressRAF) {
+    cancelAnimationFrame(ttsState.progressRAF);
+    ttsState.progressRAF = null;
+  }
+  if (ttsState.karaokeElement && ttsState.karaokeElement.length) {
+    ttsState.karaokeElement.removeClass("karaoke-active");
+  }
+}
+
+function finalize_karaoke(completed) {
+  const line = ttsState.karaokeElement;
+  if (!line || !line.length) {
+    return;
+  }
+  if (completed) {
+    set_karaoke_progress(line, 1);
+    line.removeClass("karaoke-active").addClass("karaoke-armed karaoke-complete");
+  } else {
+    line.removeClass("karaoke-active karaoke-armed karaoke-complete");
+    line.get(0).style.setProperty("--prayer-karaoke-progress", "0%");
+  }
+}
+
+function clear_karaoke_visual() {
+  const currentLines = $("#prayerCurrentStepContent .prayer-line-current");
+  currentLines.each(function() {
+    this.style.setProperty("--prayer-karaoke-progress", "0%");
+    this.style.removeProperty("--prayer-karaoke-transition");
+    this.classList.remove("karaoke-armed", "karaoke-active", "karaoke-complete");
+  });
+  ttsState.karaokeElement = currentLines.length ? currentLines.eq(0) : null;
+}
+
+function clear_auto_progress_timer() {
+  if (autoProgressTimeoutHandle) {
+    clearTimeout(autoProgressTimeoutHandle);
+    autoProgressTimeoutHandle = null;
+  }
+}
+
+function auto_advance_after_tts() {
+  if (!autoProgressEnabled || !ttsEnabled) {
+    return;
+  }
+  if (!$('body').hasClass('prayer-mode')) {
+    return;
+  }
+  if (!prayerSequence.length) {
+    return;
+  }
+  clear_auto_progress_timer();
+  const schedule = (callback, delay) => {
+    autoProgressTimeoutHandle = setTimeout(() => {
+      autoProgressTimeoutHandle = null;
+      callback();
+    }, delay);
+  };
+  const step = prayerSequence[prayerSequenceIndex];
+  if (!step) {
+    return;
+  }
+  if (lineByLineEnabled) {
+    const lines = get_step_lines(step);
+    if (prayerLineIndex < lines.length - 1) {
+      schedule(() => advance_prayer_line(), 420);
+      return;
+    }
+  }
+  if (prayerSequenceIndex < prayerSequence.length - 1) {
+    schedule(() => advance_prayer_step(), 550);
+  }
+}
+
+function schedule_parenthetical_step_skip() {
+  if (!prayerSequence.length) {
+    return;
+  }
+  clear_auto_progress_timer();
+  if (prayerSequenceIndex >= prayerSequence.length - 1) {
+    return;
+  }
+  autoProgressTimeoutHandle = setTimeout(() => {
+    autoProgressTimeoutHandle = null;
+    advance_prayer_step();
+  }, 3000);
+}
+
+function init_tts_engine() {
+  if (!ttsState.supported || typeof window === "undefined") {
+    return;
+  }
+  const ua = navigator.userAgent || "";
+  ttsState.isChrome = /Chrome\//.test(ua) && !/Edg\//.test(ua) && !/OPR\//.test(ua);
+  const populateVoices = () => {
+    if (!window.speechSynthesis) {
+      return;
+    }
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices || !voices.length) {
+      return;
+    }
+    ttsState.voices = voices;
+    ttsState.preferredVoice = select_preferred_tts_voice();
+    if (ttsState.pendingRequest && ttsEnabled && $("body").hasClass("prayer-mode")) {
+      const pending = { ...ttsState.pendingRequest };
+      ttsState.pendingRequest = null;
+      start_tts_for_text(pending.text);
+    }
+  };
+  populateVoices();
+  if (typeof window.speechSynthesis.onvoiceschanged === "function") {
+    const original = window.speechSynthesis.onvoiceschanged;
+    window.speechSynthesis.onvoiceschanged = function() {
+      populateVoices();
+      if (typeof original === "function") {
+        original();
+      }
+    };
+  } else if (window.speechSynthesis.addEventListener) {
+    window.speechSynthesis.addEventListener("voiceschanged", populateVoices);
+  }
+}
+
+function select_preferred_tts_voice() {
+  if (!ttsState.voices || !ttsState.voices.length) {
+    return null;
+  }
+  const voices = ttsState.voices;
+  const koreanVoices = voices.filter((voice) => {
+    const lang = (voice.lang || "").toLowerCase();
+    return lang.startsWith("ko");
+  });
+  if (ttsState.isChrome) {
+    const chromePreferred = koreanVoices.find((voice) => /google/i.test(voice.name));
+    if (chromePreferred) {
+      return chromePreferred;
+    }
+  }
+  const yunaVoice = koreanVoices.find((voice) => /yuna/i.test(voice.name));
+  if (yunaVoice) {
+    return yunaVoice;
+  }
+  if (koreanVoices.length) {
+    return koreanVoices[0];
+  }
+  return voices[0] || null;
+}
+
+function get_preferred_tts_voice() {
+  if (!ttsState.voices || !ttsState.voices.length) {
+    return null;
+  }
+  if (!ttsState.preferredVoice) {
+    ttsState.preferredVoice = select_preferred_tts_voice();
+  }
+  return ttsState.preferredVoice;
+}
+
+function handle_tts_enabled_change() {
+  if (!ttsEnabled) {
+    stop_tts({ cancelSpeech: true, resetKaraoke: true });
+    ttsState.pendingRequest = null;
+    ttsState.currentToken = null;
+    return;
+  }
+  if (!ttsState.supported) {
+    show_tts_support_warning();
+    ttsEnabled = false;
+    $("#plannerOptionTts").prop("checked", false);
+    writeSetting("option.tts", false);
+    return;
+  }
+  if ($("body").hasClass("prayer-mode")) {
+    handle_tts_after_render();
+  }
+}
+
+function show_tts_support_warning() {
+  ttsSupportAlerted = true;
+  const message = "현재 사용중인 브라우저에서는 음성 안내 기능(TTS)을 사용할 수 없습니다.";
+  if (typeof window !== "undefined") {
+    alert(message);
+  } else {
+    console.warn(message);
+  }
+}
+
 function render_prayer_step() {
   const contentElement = $("#prayerCurrentStepContent");
   if (!contentElement.length) {
     render_prayer_navigation_state();
     return;
   }
+  contentElement.empty();
+  reset_karaoke_visual_state();
   if (!prayerSequence.length) {
     $("#prayerCurrentMystery").text("묵주 기도");
     $("#prayerCurrentDecade").text("");
     $("#prayerCurrentStepTitle").text("기도문");
-    contentElement
-      .empty()
-      .append(
-        $("<div>")
-          .addClass("prayer-line prayer-line-current")
-          .text("묵주 기도를 시작하려면 단수를 선택해 주세요.")
-      );
+    contentElement.append(create_prayer_line_element("묵주 기도를 시작하려면 단수를 선택해 주세요.", "current"));
     prayerLineIndex = 0;
+    handle_tts_after_render();
     render_prayer_navigation_state();
     return;
   }
@@ -827,31 +1371,19 @@ function render_prayer_step() {
     }
     const currentIndex = Math.max(0, Math.min(prayerLineIndex, lines.length - 1));
     const nextIndex = currentIndex < lines.length - 1 ? currentIndex + 1 : null;
-    contentElement.empty();
-    $("<div>")
-      .addClass("prayer-line prayer-line-current")
-      .text(lines[currentIndex])
-      .appendTo(contentElement);
+    contentElement.append(create_prayer_line_element(lines[currentIndex], "current"));
     if (nextIndex !== null) {
-      $("<div>")
-        .addClass("prayer-line prayer-line-adjacent")
-        .text(lines[nextIndex])
-        .appendTo(contentElement);
+      contentElement.append(create_prayer_line_element(lines[nextIndex], "adjacent"));
     }
   } else {
     prayerLineIndex = 0;
-    contentElement
-      .empty()
-      .append(
-        $("<div>")
-          .addClass("prayer-line prayer-line-current")
-          .html(rawContent.replace(/\r?\n/g, "<br>"))
-      );
+    contentElement.append(create_prayer_line_element(rawContent, "current"));
   }
   if (step.stepId) {
     if(window.rosary)
       window.rosary.highlight_rosary_step(step.highlight || 'none');
   }
+  handle_tts_after_render();
   render_prayer_navigation_state();
 }
 
@@ -894,11 +1426,12 @@ function apply_line_by_line_effects(options = {}) {
   }
   if (allowAutoAdjust && !prevEnabled && lineByLineEnabled) {
     const autoProgressCheckbox = $("#plannerOptionAutoProgress");
-    if (autoProgressCheckbox.length && !autoProgressCheckbox.is(":checked")) {
-      autoProgressCheckbox.prop("checked", true);
-      writeSetting("option.autoProgress", true);
-    }
+  if (autoProgressCheckbox.length && !autoProgressCheckbox.is(":checked")) {
+    autoProgressCheckbox.prop("checked", true);
+    writeSetting("option.autoProgress", true);
+    autoProgressEnabled = true;
   }
+}
   update_voice_auto_option();
   if (triggerRender) {
     render_prayer_step();
@@ -1135,6 +1668,7 @@ function load_option_settings() {
     persistAutoPref = true;
   }
   $("#plannerOptionAutoProgress").prop("checked", autoPref);
+  autoProgressEnabled = autoPref;
   if (persistAutoPref && autoPref !== autoPrefOriginal) {
     writeSetting("option.autoProgress", autoPref);
   }
@@ -1154,6 +1688,7 @@ function load_option_settings() {
 
   apply_line_by_line_effects({ triggerRender: false, allowAutoAdjust: false });
   update_voice_auto_option();
+  handle_tts_enabled_change();
 }
 
 function init_option_collapse_icon() {
@@ -1322,10 +1857,12 @@ function enter_prayer_view() {
   }
   window.rosary = rosaryCanvasAPI.create(document.getElementById('rosary-canvas'));
   window.rosary.reset();
+  handle_tts_after_render();
 
 }
 
 function exit_prayer_view() {
+  stop_tts({ cancelSpeech: true, resetKaraoke: true });
   prayerSequence = [];
   prayerSequenceIndex = 0;
   prayerLineIndex = 0;
@@ -1342,6 +1879,7 @@ function exit_prayer_view() {
 $(document).ready(function() {
   show_menu_title(false);
   select_default_mystery_for_today();
+  init_tts_engine();
   load_option_settings();
   const plannerCheckboxes = $(plannerCheckboxSelector);
   plannerCheckboxes.on("change", function() {
@@ -1354,11 +1892,13 @@ $(document).ready(function() {
     ttsEnabled = $(this).is(":checked");
     writeSetting("option.tts", ttsEnabled);
     apply_line_by_line_effects();
+    handle_tts_enabled_change();
   });
   $("#plannerOptionAutoProgress").on("change", function() {
     const enabled = $(this).is(":checked");
     writeSetting("option.autoProgress", enabled);
     update_voice_auto_option();
+    autoProgressEnabled = enabled;
   });
   $("#plannerOptionLineByLine").on("change", function() {
     set_line_by_line_enabled($(this).is(":checked"));
