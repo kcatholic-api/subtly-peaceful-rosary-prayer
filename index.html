@@ -364,9 +364,14 @@
             <i class="bi bi-chevron-up" id="prayerOptionsToggleCaret" aria-hidden="true"></i>
           </button>
         </div>
-        <button type="button" class="btn btn-primary position-absolute bottom-0 end-0 m-3" id="prayerNextButton">
-          다음
-        </button>
+        <div class="position-absolute bottom-0 end-0 m-3 d-flex align-items-center gap-2">
+          <button type="button" class="btn btn-outline-secondary" id="prayerPrevButton">
+            이전
+          </button>
+          <button type="button" class="btn btn-primary" id="prayerNextButton">
+            다음
+          </button>
+        </div>
       </div>
       <div class="prayer-pane-bottom">
         <div class="prayer-lyric-area px-4 py-4">
@@ -648,19 +653,26 @@ function build_prayer_sequence() {
 }
 
 function render_prayer_navigation_state() {
+  const hasSequence = prayerSequence.length > 0;
   const hasNext = prayerSequenceIndex < prayerSequence.length - 1;
+  const hasPrev = prayerSequenceIndex > 0;
   const nextButton = $("#prayerNextButton");
-  if (!nextButton.length) {
-    return;
+  const prevButton = $("#prayerPrevButton");
+  if (nextButton.length) {
+    if (!hasSequence) {
+      nextButton.prop("disabled", true).text("다음");
+    } else if (hasNext) {
+      nextButton.prop("disabled", false).text("다음");
+    } else {
+      nextButton.prop("disabled", true).text("완료");
+    }
   }
-  if (!prayerSequence.length) {
-    nextButton.prop("disabled", true).text("다음");
-    return;
-  }
-  if (hasNext) {
-    nextButton.prop("disabled", false).text("다음");
-  } else {
-    nextButton.prop("disabled", true).text("완료");
+  if (prevButton.length) {
+    if (!hasSequence || !hasPrev) {
+      prevButton.prop("disabled", true);
+    } else {
+      prevButton.prop("disabled", false);
+    }
   }
 }
 
@@ -693,6 +705,16 @@ function advance_prayer_step() {
   }
   if (prayerSequenceIndex < prayerSequence.length - 1) {
     prayerSequenceIndex += 1;
+    render_prayer_step();
+  }
+}
+
+function retreat_prayer_step() {
+  if (!prayerSequence.length) {
+    return;
+  }
+  if (prayerSequenceIndex > 0) {
+    prayerSequenceIndex -= 1;
     render_prayer_step();
   }
 }
@@ -1007,6 +1029,7 @@ $(document).ready(function() {
   });
   $("#plannerStartButton").on("click", enter_prayer_view);
   $("#prayerExitButton").on("click", exit_prayer_view);
+  $("#prayerPrevButton").on("click", retreat_prayer_step);
   $("#prayerNextButton").on("click", advance_prayer_step);
   $("#prayerOptionsToggleButton").on("click", function() {
     const overlay = $("#prayerOptionsOverlay");
