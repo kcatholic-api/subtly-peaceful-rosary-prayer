@@ -792,7 +792,6 @@ function sync_line_by_line_toggle() {
     return;
   }
   toggle.prop("checked", lineByLineEnabled);
-  toggle.prop("disabled", ttsEnabled);
 }
 
 function render_prayer_navigation_state() {
@@ -1164,7 +1163,10 @@ function handle_tts_start() {
   ttsState.startTime = performance.now();
   ttsState.lastBoundaryTime = ttsState.startTime;
   ttsState.lastBoundaryIndex = 0;
-  ttsState.charsPerSecond = Math.max(6, Math.min(18, ttsState.textLength / 3 || 12));
+  const baseCharsPerSecond = lineByLineEnabled
+    ? Math.max(6, Math.min(18, ttsState.textLength / 3 || 12))
+    : Math.max(4, Math.min(8, ttsState.textLength / 9 || 6.5));
+  ttsState.charsPerSecond = baseCharsPerSecond;
   start_karaoke_loop();
 }
 
@@ -1558,7 +1560,7 @@ function set_line_by_line_enabled(enabled, options = {}) {
 function apply_line_by_line_effects(options = {}) {
   const { triggerRender = true, allowAutoAdjust = true } = options;
   const prevEnabled = lineByLineEnabled;
-  lineByLineEnabled = ttsEnabled || lineByLinePreference;
+  lineByLineEnabled = lineByLinePreference;
   sync_line_by_line_toggle();
   const linePrevButton = $("#prayerLinePrevButton");
   const lineNextButton = $("#prayerLineNextButton");
