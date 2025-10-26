@@ -566,15 +566,20 @@ function create_concluding_steps() {
   ];
 }
 
-function create_decade_steps({ mysteryTitle, decadeLabel, meditation, hailMaryCount }) {
+function create_decade_steps({ mysteryTitle, decadeIndex, decadeLabel, meditation, hailMaryCount }) {
   const steps = [];
+  console.log('create', mysteryTitle , decadeIndex, decadeLabel, meditation, hailMaryCount);
+  var pater_highlight = 'pater-'+(decadeIndex-1);
+  if (decadeIndex == 0)
+    pater_highlight = 'medal';
+  console.log(`${decadeLabel} 묵상`,pater_highlight)
   steps.push({
     type: "meditation",
     mysteryTitle,
     decadeLabel,
     title: `${decadeLabel} 묵상`,
     content: meditation,
-    highlight: 'none'
+    highlight: pater_highlight
   });
   steps.push({
     type: "prayer",
@@ -582,8 +587,9 @@ function create_decade_steps({ mysteryTitle, decadeLabel, meditation, hailMaryCo
     decadeLabel,
     title: "주님의 기도",
     content: rosaryPrayerTexts.ourFather,
-    highlight: 'none'
+    highlight: pater_highlight
   });
+  console.log(pater_highlight);
   for (let i = 1; i <= hailMaryCount; i += 1) {
     steps.push({
       type: "prayer",
@@ -591,26 +597,32 @@ function create_decade_steps({ mysteryTitle, decadeLabel, meditation, hailMaryCo
       decadeLabel,
       title: "성모송",
       content: rosaryPrayerTexts.hailMary,
-      highlight: 'none',
+      highlight: 'ave-'+decadeIndex+'-'+(i-1),
       progressLabel: `${i}/${hailMaryCount}`
     });
+    console.log('ave-'+decadeIndex+'-'+(i-1));
   }
+  pater_highlight = 'pater-'+(decadeIndex);
+  if((decadeIndex+1) == 5)
+    pater_highlight = 'medal';
   steps.push({
     type: "prayer",
     mysteryTitle,
     decadeLabel,
     title: "영광송",
     content: rosaryPrayerTexts.gloryBe,
-    highlight: 'none'
+    highlight: pater_highlight
   });
+    console.log(pater_highlight);
   steps.push({
     type: "prayer",
     mysteryTitle,
     decadeLabel,
     title: "구원의 기도",
     content: rosaryPrayerTexts.fatimaPrayer,
-    highlight: 'none'
+    highlight: pater_highlight
   });
+    console.log(pater_highlight);
   return steps;
 }
 
@@ -630,6 +642,7 @@ function build_prayer_sequence() {
       const decade = data.decades[index];
       sequence.push(...create_decade_steps({
         mysteryTitle: data.title,
+        decadeIndex: index,
         decadeLabel: decade.label,
         meditation: decade.meditation,
         hailMaryCount: 10
@@ -687,9 +700,8 @@ function render_prayer_step() {
   $("#prayerCurrentStepTitle").text(titleText);
   $("#prayerCurrentStepContent").html(step.content.replace(/\n/g, "<br>"));
   if (step.stepId) {
-    console.log(`step = ${step.stepId}`);
-    if(window.app)
-      window.app.highlight_rosary_step(step.highlight || 'none');
+    if(window.rosary)
+      window.rosary.highlight_rosary_step(step.highlight || 'none');
   }
   render_prayer_navigation_state();
 }
@@ -977,8 +989,8 @@ function enter_prayer_view() {
   $("#mainNavbar, #mainFooter").addClass("d-none");
   $("#plannerView").addClass("d-none");
   $("#prayerView").removeClass("d-none");
-  window.app = RosaryCanvas.create(document.getElementById('rosary-canvas'));
-  window.app.reset();
+  window.rosary = RosaryCanvas.create(document.getElementById('rosary-canvas'));
+  window.rosary.reset();
 
 }
 
