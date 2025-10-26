@@ -808,6 +808,20 @@ function render_prayer_step() {
   render_prayer_navigation_state();
 }
 
+function set_line_by_line_enabled(enabled, options = {}) {
+  const { persist = true, triggerRender = true, allowAutoAdjust = true } = options;
+  const next = !!enabled;
+  lineByLinePreference = next;
+  if (persist) {
+    writeSetting("option.lineByLine", next);
+  }
+  const toggle = $("#plannerOptionLineByLine");
+  if (toggle.length) {
+    toggle.prop("checked", next);
+  }
+  apply_line_by_line_effects({ triggerRender, allowAutoAdjust });
+}
+
 function apply_line_by_line_effects(options = {}) {
   const { triggerRender = true, allowAutoAdjust = true } = options;
   const prevEnabled = lineByLineEnabled;
@@ -860,6 +874,9 @@ function apply_horizontal_split_layout() {
   layout.toggleClass("horizontal-split", shouldSplit);
   if (wasSplit !== shouldSplit) {
     schedule_rosary_canvas_refresh();
+  }
+  if (shouldSplit && lineByLinePreference) {
+    set_line_by_line_enabled(false);
   }
 }
 
@@ -1297,9 +1314,7 @@ $(document).ready(function() {
     update_voice_auto_option();
   });
   $("#plannerOptionLineByLine").on("change", function() {
-    lineByLinePreference = $(this).is(":checked");
-    writeSetting("option.lineByLine", lineByLinePreference);
-    apply_line_by_line_effects();
+    set_line_by_line_enabled($(this).is(":checked"));
   });
   $("#plannerOptionVoiceAuto").on("change", function() {
     voiceAutoPreference = $(this).is(":checked");
