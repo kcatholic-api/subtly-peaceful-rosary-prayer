@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" integrity="sha512-dPXYcDub/aeb08c63jRq/k6GaKccl256JQy/AnOq7CAnEZ9FzSL9wSbcZkMp4R26vBsMLFYH4kQ67/bbV8XaCQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js" integrity="sha512-v2CJ7UaYy4JwqLDIrZUI/4hqeoQieOmAZNXBeQyjo21dadnwR+8ZaIJVT8EE2iyI61OV8e6M8PP2/4hpQINQ/g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="rosary-canvas.js"></script>
 
     <link rel="icon" href="favicon.ico">
 
@@ -318,19 +319,16 @@
   <div id="prayerView" class="d-none">
     <div class="prayer-layout">
       <div class="prayer-pane-top position-relative">
-        <div class="d-flex justify-content-between align-items-start p-4 h-100">
-          <div class="prayer-metadata">
-            <div class="d-flex align-items-baseline flex-wrap gap-2">
-              <h3 class="fw-bold mb-0" id="prayerCurrentMystery">환의의 신비</h3>
-              <div class="fw-semibold fs-5 text-muted" id="prayerCurrentDecade">1단</div>
-            </div>
+        <canvas id="rosary-canvas" style="width:100%;height:100%"></canvas>
+        <div class="prayer-metadata position-absolute top-0 start-0 m-3">
+          <div class="d-flex align-items-baseline flex-wrap gap-2">
+            <h3 class="fw-bold mb-0" id="prayerCurrentMystery">환의의 신비</h3>
+            <div class="fw-semibold fs-5 text-muted" id="prayerCurrentDecade">1단</div>
           </div>
-          <button type="button" class="btn btn-outline-secondary btn-sm" id="prayerExitButton" aria-label="플래너로 돌아가기">
-            <i class="bi bi-x-lg"></i>
-          </button>
         </div>
-        <div class="prayer-options-overlay position-absolute bottom-0 start-0 m-3" id="prayerOptionsOverlay">
-        </div>
+        <button type="button" class="btn btn-outline-secondary btn-sm position-absolute top-0 end-0 m-0 m-3" id="prayerExitButton" aria-label="플래너로 돌아가기">
+          <i class="bi bi-x-lg"></i>
+        </button>
         <button type="button" class="btn btn-primary position-absolute bottom-0 end-0 m-3" id="prayerNextButton">
           다음
         </button>
@@ -385,6 +383,7 @@ const settingsPrefix = "kcatolic-api-sprp-settings.";
 let voiceAutoPreference = false;
 let prayerSequence = [];
 let prayerSequenceIndex = 0;
+let prayerStepIdCounter = 0;
 
 const rosaryPrayerTexts = {
   apostlesCreed: "전능하신 천주 성부, 천지의 창조주를 저는 믿나이다.\n그 외아들 우리 주 예수 그리스도님,\n성령으로 인하여 동정 마리아께 잉태되어 나시고,\n본시오 빌라도 통치 아래에서 고난을 받으시고,\n십자가에 못 박혀 돌아가시고 묻히셨으며,\n저승에 가시어 사흗날에 죽은 이들 가운데서 부활하시고,\n하늘에 올라 전능하신 천주 성부 오른편에 앉아 계시며,\n그리로부터 산 이와 죽은 이를 심판하러 오시리라 믿나이다.\n성령을 믿으며,\n거룩하고 보편된 교회와 모든 성인의 통공을 믿으며,\n죄의 용서와 육신의 부활을 믿으며,\n영원한 삶을 믿나이다. 아멘.",
@@ -449,56 +448,64 @@ function create_intro_steps() {
       mysteryTitle: "묵주 기도",
       decadeLabel: "",
       title: "준비",
-      content: "성호경 및 십자가의 예수님 발에 입맞춤"
+      content: "성호경 및 십자가의 예수님 발에 입맞춤",
+      highlight: 'none'
     },
     {
       type: "intro",
       mysteryTitle: "묵주 기도",
       decadeLabel: "",
       title: "사도신경",
-      content: rosaryPrayerTexts.apostlesCreed
+      content: rosaryPrayerTexts.apostlesCreed,
+      highlight: 'cross'
     },
     {
       type: "intro",
       mysteryTitle: "묵주 기도",
       decadeLabel: "",
       title: "주님의 기도",
-      content: rosaryPrayerTexts.ourFather
+      content: rosaryPrayerTexts.ourFather,
+      highlight: 'intro-0'
     },
     {
       type: "intro",
       mysteryTitle: "묵주 기도",
       decadeLabel: "",
       title: "성모송 (1/3)",
-      content: rosaryPrayerTexts.hailMary
+      content: rosaryPrayerTexts.hailMary,
+      highlight: 'intro-1'
     },
     {
       type: "intro",
       mysteryTitle: "묵주 기도",
       decadeLabel: "",
       title: "성모송 (2/3)",
-      content: rosaryPrayerTexts.hailMary
+      content: rosaryPrayerTexts.hailMary,
+      highlight: 'intro-2'
     },
     {
       type: "intro",
       mysteryTitle: "묵주 기도",
       decadeLabel: "",
       title: "성모송 (3/3)",
-      content: rosaryPrayerTexts.hailMary
+      content: rosaryPrayerTexts.hailMary,
+      highlight: 'intro-3'
     },
     {
       type: "intro",
       mysteryTitle: "묵주 기도",
       decadeLabel: "",
       title: "영광송",
-      content: rosaryPrayerTexts.gloryBe
+      content: rosaryPrayerTexts.gloryBe,
+      highlight: 'intro-4'
     },
     {
       type: "intro",
       mysteryTitle: "묵주 기도",
       decadeLabel: "",
       title: "구원을 위한 기도",
-      content: rosaryPrayerTexts.fatimaPrayer
+      content: rosaryPrayerTexts.fatimaPrayer,
+      highlight: 'intro-4'
     }
   ];
 }
@@ -510,14 +517,16 @@ function create_concluding_steps() {
       mysteryTitle: "묵주 기도",
       decadeLabel: "",
       title: "성모찬송",
-      content: rosaryPrayerTexts.hailHolyQueen
+      content: rosaryPrayerTexts.hailHolyQueen,
+      highlight: 'medal'
     },
     {
       type: "conclusion",
       mysteryTitle: "묵주 기도",
       decadeLabel: "",
       title: "마무리",
-      content: "성호경 및 십자가의 예수님 발에 입맞춤"
+      content: "성호경 및 십자가의 예수님 발에 입맞춤",
+      highlight: 'none'
     }
   ];
 }
@@ -529,14 +538,16 @@ function create_decade_steps({ mysteryTitle, decadeLabel, meditation, hailMaryCo
     mysteryTitle,
     decadeLabel,
     title: `${decadeLabel} 묵상`,
-    content: meditation
+    content: meditation,
+    highlight: 'none'
   });
   steps.push({
     type: "prayer",
     mysteryTitle,
     decadeLabel,
     title: "주님의 기도",
-    content: rosaryPrayerTexts.ourFather
+    content: rosaryPrayerTexts.ourFather,
+    highlight: 'none'
   });
   for (let i = 1; i <= hailMaryCount; i += 1) {
     steps.push({
@@ -545,6 +556,7 @@ function create_decade_steps({ mysteryTitle, decadeLabel, meditation, hailMaryCo
       decadeLabel,
       title: "성모송",
       content: rosaryPrayerTexts.hailMary,
+      highlight: 'none',
       progressLabel: `${i}/${hailMaryCount}`
     });
   }
@@ -553,19 +565,22 @@ function create_decade_steps({ mysteryTitle, decadeLabel, meditation, hailMaryCo
     mysteryTitle,
     decadeLabel,
     title: "영광송",
-    content: rosaryPrayerTexts.gloryBe
+    content: rosaryPrayerTexts.gloryBe,
+    highlight: 'none'
   });
   steps.push({
     type: "prayer",
     mysteryTitle,
     decadeLabel,
     title: "구원의 기도",
-    content: rosaryPrayerTexts.fatimaPrayer
+    content: rosaryPrayerTexts.fatimaPrayer,
+    highlight: 'none'
   });
   return steps;
 }
 
 function build_prayer_sequence() {
+  prayerStepIdCounter = 0;
   const sequence = create_intro_steps();
   plannerMysteryControls.forEach(({ checkbox, select }) => {
     const checkboxElement = $(checkbox);
@@ -587,7 +602,14 @@ function build_prayer_sequence() {
     }
   });
   sequence.push(...create_concluding_steps());
-  return sequence;
+  return sequence.map((step) => {
+    prayerStepIdCounter += 1;
+    const prefix = step.type || "step";
+    return {
+      ...step,
+      stepId: `${prefix}-${prayerStepIdCounter}`
+    };
+  });
 }
 
 function render_prayer_navigation_state() {
@@ -622,6 +644,11 @@ function render_prayer_step() {
   const titleText = step.progressLabel ? `${step.title} (${step.progressLabel})` : step.title;
   $("#prayerCurrentStepTitle").text(titleText);
   $("#prayerCurrentStepContent").html(step.content.replace(/\n/g, "<br>"));
+  if (step.stepId) {
+    console.log(`step = ${step.stepId}`);
+    if(window.app)
+      window.app.highlight_rosary_step(step.highlight || 'none');
+  }
   render_prayer_navigation_state();
 }
 
@@ -819,6 +846,7 @@ function move_options_to_planner() {
 }
 
 function enter_prayer_view() {
+
   prayerSequence = build_prayer_sequence();
   prayerSequenceIndex = 0;
   render_prayer_step();
@@ -833,6 +861,9 @@ function enter_prayer_view() {
   $("#mainNavbar, #mainFooter").addClass("d-none");
   $("#plannerView").addClass("d-none");
   $("#prayerView").removeClass("d-none");
+  window.app = RosaryCanvas.create(document.getElementById('rosary-canvas'));
+  window.app.reset();
+
 }
 
 function exit_prayer_view() {
@@ -878,6 +909,7 @@ $(document).ready(function() {
   $("#plannerStartButton").on("click", enter_prayer_view);
   $("#prayerExitButton").on("click", exit_prayer_view);
   $("#prayerNextButton").on("click", advance_prayer_step);
+
   render_prayer_step();
 
   if(window.location.hash == "") {
