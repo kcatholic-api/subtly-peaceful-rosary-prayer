@@ -392,9 +392,6 @@
             <h3 class="fw-bold mb-0" id="prayerCurrentMystery">환의의 신비</h3>
             <div class="fw-semibold fs-5 text-muted" id="prayerCurrentDecade">1단</div>
           </div>
-          <div class="prayer-step-title w-100 mb-3">
-            <p class="text-secondary fw-semibold mb-0" id="prayerCurrentStepTitle">이 영역은 추후 묵주 기도문을 표시하기 위한 자리입니다.</p>
-          </div>
         </div>
         <button type="button" class="btn btn-outline-secondary btn-sm position-absolute top-0 end-0 m-0 m-3" id="prayerExitButton" aria-label="플래너로 돌아가기">
           <i class="bi bi-x-lg"></i>
@@ -416,6 +413,9 @@
         </div>
       </div>
       <div class="prayer-pane-bottom">
+        <div class="prayer-metadata position-absolute top-0 start-0 m-3">
+          <p class="text-secondary fw-semibold mb-3" id="prayerCurrentStepTitle">기도문 제목</p>
+        </div>
         <button type="button" class="btn btn-outline-secondary btn-sm prayer-line-button position-absolute top-0 end-0 m-3" id="prayerLinePrevButton" aria-label="이전 줄">▲</button>
         <div class="prayer-lyric-area px-4 py-4">
           <div class="prayer-step-body w-100">
@@ -470,6 +470,7 @@ let lineByLineEnabled = true;
 let ttsEnabled = false;
 let prayerStepIdCounter = 0;
 let horizontalSplitPreference = false;
+let rosaryLayoutRefreshHandle = null;
 
 const rosaryPrayerTexts = {
   apostlesCreed: "╋ 전능하신 천주 성부, ◎ 천지의 창조주를 저는 믿나이다.\n그 외아들 우리 주 예수 그리스도님,\n성령으로 인하여 동정 마리아께 잉태되어 나시고,\n본시오 빌라도 통치 아래에서 고난을 받으시고,\n십자가에 못 박혀 돌아가시고 묻히셨으며,\n저승에 가시어 사흗날에 죽은 이들 가운데서 부활하시고,\n하늘에 올라 전능하신 천주 성부 오른편에 앉아 계시며,\n그리로부터 산 이와 죽은 이를 심판하러 오시리라 믿나이다.\n성령을 믿으며,\n거룩하고 보편된 교회와 모든 성인의 통공을 믿으며,\n죄의 용서와 육신의 부활을 믿으며,\n영원한 삶을 믿나이다. 아멘.",
@@ -756,7 +757,7 @@ function render_prayer_navigation_state() {
     }
   }
   if (prevButton.length) {
-    prevButton.text("이전 단계");
+    //prevButton.text("이전 단계");
     if (!hasSequence || !hasPrevStep) {
       prevButton.prop("disabled", true);
     } else {
@@ -855,7 +856,11 @@ function apply_horizontal_split_layout() {
     return;
   }
   const shouldSplit = horizontalSplitPreference && is_landscape_orientation();
+  const wasSplit = layout.hasClass("horizontal-split");
   layout.toggleClass("horizontal-split", shouldSplit);
+  if (wasSplit !== shouldSplit) {
+    schedule_rosary_canvas_refresh();
+  }
 }
 
 function update_horizontal_split_option_state() {
@@ -879,6 +884,24 @@ function update_horizontal_split_option_state() {
   if (notice.length) {
     notice.toggleClass("d-none", landscape);
   }
+}
+
+function schedule_rosary_canvas_refresh() {
+  if (typeof window === "undefined" || !window.rosary) {
+    return;
+  }
+  if (rosaryLayoutRefreshHandle) {
+    cancelAnimationFrame(rosaryLayoutRefreshHandle);
+  }
+  rosaryLayoutRefreshHandle = requestAnimationFrame(() => {
+    rosaryLayoutRefreshHandle = null;
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("resize"));
+    }
+    if (window.rosary && typeof window.rosary.reset === "function") {
+      window.rosary.reset();
+    }
+  });
 }
 
 function advance_prayer_line() {
