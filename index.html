@@ -78,6 +78,25 @@
         justify-content: center;
         align-items: center;
       }
+      .prayer-step-text {
+        font-size: 1.25rem;
+        font-weight: 600;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        align-items: center;
+      }
+      .prayer-line {
+        margin: 0;
+        line-height: 1.4;
+      }
+      .prayer-line-current {
+        color: #212529;
+      }
+      .prayer-line-adjacent {
+        color: rgba(108, 117, 125, 0.6);
+        font-size: 0.9rem;
+      }
       .prayer-options-overlay {
         max-width: 320px;
       }
@@ -419,7 +438,7 @@
         <button type="button" class="btn btn-outline-secondary btn-sm prayer-line-button position-absolute top-0 end-0 m-3" id="prayerLinePrevButton" aria-label="이전 줄">▲</button>
         <div class="prayer-lyric-area px-4 py-4">
           <div class="prayer-step-body w-100">
-            <p class="lead fw-semibold mb-0 text-center w-100" id="prayerCurrentStepContent">기도문이 여기에 표시됩니다.</p>
+            <div class="prayer-step-text text-center w-100" id="prayerCurrentStepContent" role="presentation"></div>
           </div>
         </div>
         <button type="button" class="btn btn-primary btn-sm prayer-line-button position-absolute bottom-0 end-0 m-3" id="prayerLineNextButton" aria-label="다음 줄">▼</button>
@@ -775,11 +794,22 @@ function render_prayer_navigation_state() {
 }
 
 function render_prayer_step() {
+  const contentElement = $("#prayerCurrentStepContent");
+  if (!contentElement.length) {
+    render_prayer_navigation_state();
+    return;
+  }
   if (!prayerSequence.length) {
     $("#prayerCurrentMystery").text("묵주 기도");
     $("#prayerCurrentDecade").text("");
     $("#prayerCurrentStepTitle").text("기도문");
-    $("#prayerCurrentStepContent").text("묵주 기도를 시작하려면 단수를 선택해 주세요.");
+    contentElement
+      .empty()
+      .append(
+        $("<div>")
+          .addClass("prayer-line prayer-line-current")
+          .text("묵주 기도를 시작하려면 단수를 선택해 주세요.")
+      );
     prayerLineIndex = 0;
     render_prayer_navigation_state();
     return;
@@ -795,11 +825,28 @@ function render_prayer_step() {
     if (prayerLineIndex >= lines.length) {
       prayerLineIndex = 0;
     }
-    const lineText = lines[Math.max(0, Math.min(prayerLineIndex, lines.length - 1))];
-    $("#prayerCurrentStepContent").text(lineText);
+    const currentIndex = Math.max(0, Math.min(prayerLineIndex, lines.length - 1));
+    const nextIndex = currentIndex < lines.length - 1 ? currentIndex + 1 : null;
+    contentElement.empty();
+    $("<div>")
+      .addClass("prayer-line prayer-line-current")
+      .text(lines[currentIndex])
+      .appendTo(contentElement);
+    if (nextIndex !== null) {
+      $("<div>")
+        .addClass("prayer-line prayer-line-adjacent")
+        .text(lines[nextIndex])
+        .appendTo(contentElement);
+    }
   } else {
     prayerLineIndex = 0;
-    $("#prayerCurrentStepContent").html(rawContent.replace(/\r?\n/g, "<br>"));
+    contentElement
+      .empty()
+      .append(
+        $("<div>")
+          .addClass("prayer-line prayer-line-current")
+          .html(rawContent.replace(/\r?\n/g, "<br>"))
+      );
   }
   if (step.stepId) {
     if(window.rosary)
