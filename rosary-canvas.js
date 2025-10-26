@@ -20,16 +20,21 @@
     CROSS_WIDTH: 24,
     CROSS_HEIGHT: 34,
     COLLISION_REPULSION: 0.3,
-    COLOR_BG_INNER: '#ffffff',
-    COLOR_BG_OUTER: '#ffffff',
-    COLOR_STRING: 'rgba(45, 39, 20, 0.85)',
+    COLOR_BG_INNER: '#321111ff',
+    COLOR_BG_OUTER: '#1f0b0bff',
+    COLOR_STRING: 'rgba(148,106,68,0.65)',
     COLOR_BEAD_STROKE: 'rgba(78,47,23,0.85)',
     COLOR_PIN: '#e5c07b',
     COLOR_DRAG: 'rgba(255,255,255,.9)',
     COLOR_AVE: '#d4a373',
     COLOR_PATER: '#b07f49',
     COLOR_MEDAL: '#d9b26d',
-    COLOR_HIGHLIGHT: '#ff0000',
+    COLOR_HIGHLIGHT: '#f7d58b',
+    HIGHLIGHT_GLOW_INNER: 'rgba(255,249,227,0.95)',
+    HIGHLIGHT_GLOW_MID: 'rgba(249,224,160,0.75)',
+    HIGHLIGHT_GLOW_OUTER: 'rgba(196,138,45,0.05)',
+    HIGHLIGHT_RING: 'rgba(255,232,173,0.85)',
+    HIGHLIGHT_PULSE_RATE: 2.4,
     CROSS_STROKE: '#7f4e24',
     CROSS_GRAD_TOP: '#f2d4a9',
     CROSS_GRAD_BOTTOM: '#b67f3c',
@@ -96,7 +101,7 @@
     let CFG = { ...CFG_BASE, ...(userCfg||{}) }; // 현재 활성 설정(색상/물리 고정값 포함)
     let SCALE = 1; // 캔버스 기반 스케일
     let nodes=[], links=[]; let dragging=null; let pointer={x:0,y:0};
-    let highlightedId=null; let last=performance.now();
+    let highlightedId=null; let last=performance.now(); let animTime=0;
 
     const radiusOverrides = () => ({
       AVE: CFG.RADIUS_AVE, PATER: CFG.RADIUS_PATER, MEDAL: CFG.RADIUS_MEDAL
@@ -120,7 +125,8 @@
     function beadFill(node, isHighlighted){
       if (isHighlighted){
         const glow = ctx.createRadialGradient(node.x, node.y, node.radius * 0.1, node.x, node.y, node.radius);
-        glow.addColorStop(0, '#ffd6d6');
+        glow.addColorStop(0, CFG.HIGHLIGHT_GLOW_INNER);
+        glow.addColorStop(0.6, CFG.HIGHLIGHT_GLOW_MID);
         glow.addColorStop(1, CFG.COLOR_HIGHLIGHT);
         return glow;
       }
@@ -141,6 +147,41 @@
       ctx.strokeStyle = tone.dark;
       ctx.beginPath();
       ctx.arc(node.x + node.radius * 0.15, node.y + node.radius * 0.2, node.radius * 0.4, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawHighlightHalo(node, time){
+      const pulseRate = CFG.HIGHLIGHT_PULSE_RATE || 2.4;
+      const oscillation = (Math.sin(time * pulseRate) + 1) * 0.5;
+      const crossMetrics = node.kind === TYPE.CROSS ? crossSize() : null;
+      const baseRadius = node.kind === TYPE.CROSS
+        ? Math.max(crossMetrics.w, crossMetrics.h) * 0.55
+        : node.radius * 1.35;
+      const outerRadius = baseRadius + (node.radius * 0.9) + oscillation * node.radius * 0.9;
+      const gradient = ctx.createRadialGradient(
+        node.x,
+        node.y,
+        Math.max(1, baseRadius * 0.35),
+        node.x,
+        node.y,
+        outerRadius
+      );
+      gradient.addColorStop(0, CFG.HIGHLIGHT_GLOW_INNER);
+      gradient.addColorStop(0.45, CFG.HIGHLIGHT_GLOW_MID);
+      gradient.addColorStop(1, CFG.HIGHLIGHT_GLOW_OUTER);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.7;
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, outerRadius, 0, Math.PI * 2);
+      ctx.fillStyle = gradient;
+      ctx.fill();
+      ctx.globalAlpha = 0.5 + oscillation * 0.3;
+      ctx.lineWidth = Math.max(0.8, node.radius * 0.3);
+      ctx.strokeStyle = CFG.HIGHLIGHT_RING;
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, baseRadius + oscillation * node.radius * 0.6, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     }
@@ -235,7 +276,7 @@
       const dotR=Math.max(1, Math.min(2.2, stem*0.12)); ctx.beginPath(); ctx.arc(-armLen+2,0,dotR,0,Math.PI*2); ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fill(); ctx.beginPath(); ctx.arc(armLen-2,0,dotR,0,Math.PI*2); ctx.fill(); ctx.restore();
     }
 
-    function draw(){
+    function draw(time=0){
       ctx.clearRect(0,0,W,H);
       const bg = ctx.createRadialGradient(W*0.5, H*0.35, Math.max(W,H)*0.05, W*0.5, H*0.4, Math.max(W,H)*0.8);
       bg.addColorStop(0, CFG.COLOR_BG_INNER);
@@ -252,6 +293,9 @@
 
       for(const n of nodes){
         const isHighlighted = (highlightedId && n.node_id===highlightedId);
+        if (isHighlighted){
+          drawHighlightHalo(n, time);
+        }
         ctx.beginPath();
         ctx.arc(n.x,n.y,n.radius,0,Math.PI*2);
         ctx.fillStyle = beadFill(n, !!isHighlighted);
@@ -277,13 +321,28 @@
     function PO(e){ const r=canvas.getBoundingClientRect(); if(e.touches&&e.touches[0]) return {x:e.touches[0].clientX-r.left, y:e.touches[0].clientY-r.top}; return {x:e.clientX-r.left, y:e.clientY-r.top}; }
     function nearestNode(x,y,maxR=28){ let best=null, bd=maxR*maxR; for(const n of nodes){ const dx=n.x-x, dy=n.y-y, d2=dx*dx+dy*dy; const lim=(n.radius+10), lim2=lim*lim; const use=Math.min(bd,lim2); if(d2<use){ bd=d2; best=n; } } return best; }
 
-    function loopRAF(t){ const now=t||performance.now(); const dt=Math.min(0.033,(now-last)/1000); last=now; step(dt); draw(); _raf = requestAnimationFrame(loopRAF); }
+    function loopRAF(t){
+      const now=t||performance.now();
+      const dt=Math.min(0.033,(now-last)/1000);
+      last=now;
+      animTime += dt;
+      step(dt);
+      draw(animTime);
+      _raf = requestAnimationFrame(loopRAF);
+    }
     let _raf=null;
 
     function showPinTip(x,y){ const el=pinTip; if(!el) return; el.style.left=x+'px'; el.style.top=y+'px'; el.style.display='block'; clearTimeout(showPinTip._t); showPinTip._t=setTimeout(()=> el.style.display='none', 600); }
 
     // 공개 API --------------------------------------------------------------
-    function init(){ resize(); initRosary(); if(_raf) cancelAnimationFrame(_raf); _raf = requestAnimationFrame(loopRAF); }
+    function init(){
+      resize();
+      initRosary();
+      animTime = 0;
+      last = performance.now();
+      if(_raf) cancelAnimationFrame(_raf);
+      _raf = requestAnimationFrame(loopRAF);
+    }
     function reset(){ initRosary(); }
     function highlight_rosary_step(id){ const n = nodes.find(v=> v.node_id===id); if(!n){ highlightedId=null; return false; } highlightedId=id; return true; }
     function destroy(){ if(_raf) cancelAnimationFrame(_raf); _raf=null; nodes=[]; links=[]; }
