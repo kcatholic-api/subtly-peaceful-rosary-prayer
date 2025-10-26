@@ -102,6 +102,7 @@
     let SCALE = 1; // 캔버스 기반 스케일
     let nodes=[], links=[]; let dragging=null; let pointer={x:0,y:0};
     let highlightedId=null; let last=performance.now(); let animTime=0;
+    let bgRadiusPx = 0;
 
     const radiusOverrides = () => ({
       AVE: CFG.RADIUS_AVE, PATER: CFG.RADIUS_PATER, MEDAL: CFG.RADIUS_MEDAL
@@ -151,6 +152,21 @@
       ctx.restore();
     }
 
+    function roundedRectPath(context, x, y, width, height, radius){
+      const limit = Math.min(width, height) * 0.5;
+      const r = Math.max(0, Math.min(radius, limit));
+      context.moveTo(x + r, y);
+      context.lineTo(x + width - r, y);
+      context.quadraticCurveTo(x + width, y, x + width, y + r);
+      context.lineTo(x + width, y + height - r);
+      context.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+      context.lineTo(x + r, y + height);
+      context.quadraticCurveTo(x, y + height, x, y + height - r);
+      context.lineTo(x, y + r);
+      context.quadraticCurveTo(x, y, x + r, y);
+      context.closePath();
+    }
+
     function drawHighlightHalo(node, time){
       const pulseRate = CFG.HIGHLIGHT_PULSE_RATE || 2.4;
       const oscillation = (Math.sin(time * pulseRate) + 1) * 0.5;
@@ -198,6 +214,13 @@
       SCALE = scaleFromCanvas(W,H);
       const scaled = scaledCfg(CFG_BASE, SCALE);
       CFG = { ...CFG, ...scaled };
+      if (typeof window !== 'undefined' && window.getComputedStyle){
+        const computed = parseFloat(window.getComputedStyle(canvas).fontSize);
+        const fontSizePx = Number.isFinite(computed) ? computed : 16;
+        bgRadiusPx = fontSizePx * 0.75;
+      } else {
+        bgRadiusPx = 12; // 기본 폰트 16px 가정 → 0.75em
+      }
     }
 
     function initRosary(){
@@ -281,8 +304,12 @@
       const bg = ctx.createRadialGradient(W*0.5, H*0.35, Math.max(W,H)*0.05, W*0.5, H*0.4, Math.max(W,H)*0.8);
       bg.addColorStop(0, CFG.COLOR_BG_INNER);
       bg.addColorStop(1, CFG.COLOR_BG_OUTER);
+      ctx.save();
+      ctx.beginPath();
+      roundedRectPath(ctx, 0, 0, W, H, bgRadiusPx);
       ctx.fillStyle = bg;
-      ctx.fillRect(0, 0, W, H);
+      ctx.fill();
+      ctx.restore();
       ctx.lineWidth=3; ctx.strokeStyle=CFG.COLOR_STRING; ctx.beginPath();
       const loop=collectLoop(); const medal=nodes[54];
       for(let i=0;i<loop.length-1;i++){ const a=loop[i], b=loop[i+1]; ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); }
