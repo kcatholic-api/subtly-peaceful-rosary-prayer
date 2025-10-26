@@ -327,6 +327,10 @@
                     <input class="form-check-input" type="checkbox" role="switch" id="plannerOptionFullscreen">
                     <label class="form-check-label" for="plannerOptionFullscreen">전체 화면으로 보기</label>
                   </div>
+                  <div id="prayerViewOptions" class="d-none">
+                    <hr/>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="rosaryLayoutResetButton">묵주 레이아웃 초기화</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -928,6 +932,7 @@ function move_options_to_overlay() {
   const wrapper = $("#plannerOptionsWrapper");
   if (overlay.length && wrapper.length) {
     overlay.append(wrapper);
+    $("#prayerViewOptions").removeClass("d-none");
     wrapper.addClass("prayer-overlay-active");
     const headerButton = wrapper.children("button[data-bs-toggle=\"collapse\"]");
     if (headerButton.length) {
@@ -966,6 +971,7 @@ function move_options_to_planner() {
     if (headerButton.length) {
       headerButton.removeClass("d-none").removeAttr("aria-hidden");
     }
+    $("#prayerViewOptions").addClass("d-none");
     wrapper.removeClass("prayer-overlay-active");
     home.append(wrapper);
     reset_option_collapse_state();
@@ -1038,6 +1044,11 @@ $(document).ready(function() {
   $("#prayerExitButton").on("click", exit_prayer_view);
   $("#prayerPrevButton").on("click", retreat_prayer_step);
   $("#prayerNextButton").on("click", advance_prayer_step);
+  $("#rosaryLayoutResetButton").on("click", function() {
+    if(window.rosary) {
+      window.rosary.reset();
+    }
+  });
   $("#prayerOptionsToggleButton").on("click", function() {
     const overlay = $("#prayerOptionsOverlay");
     if (!overlay.length || !overlay.children().length) {
