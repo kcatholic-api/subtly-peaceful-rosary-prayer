@@ -24,6 +24,22 @@
         min-height: calc(100vh - 160px);
         gap: 0rem;
       }
+      .prayer-layout.horizontal-split {
+        grid-template-rows: minmax(0, 1fr);
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .prayer-layout.horizontal-split .prayer-pane-top,
+      .prayer-layout.horizontal-split .prayer-pane-bottom {
+        min-height: 0;
+      }
+      .prayer-layout.horizontal-split .prayer-pane-top {
+        grid-column: 1;
+        grid-row: 1;
+      }
+      .prayer-layout.horizontal-split .prayer-pane-bottom {
+        grid-column: 2;
+        grid-row: 1;
+      }
       .prayer-pane-bottom {
         background-color: #ffffff;
         border: 1px solid #dee2e6;
@@ -131,6 +147,10 @@
         min-height: 0;
         height: 100%;
         grid-template-rows: minmax(0, 8fr) minmax(140px, 2fr);
+      }
+      body.prayer-mode .prayer-layout.horizontal-split {
+        grid-template-rows: minmax(0, 1fr);
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
       body.prayer-mode .prayer-pane-top {
         min-height: 0;
@@ -342,6 +362,11 @@
                     <input class="form-check-input" type="checkbox" role="switch" id="plannerOptionFullscreen">
                     <label class="form-check-label" for="plannerOptionFullscreen">전체 화면으로 보기</label>
                   </div>
+                  <div class="form-check form-switch mt-2" id="plannerOptionHorizontalSplitContainer">
+                    <input class="form-check-input" type="checkbox" role="switch" id="plannerOptionHorizontalSplit">
+                    <label class="form-check-label" for="plannerOptionHorizontalSplit">좌우 5:5로 보여주기</label>
+                  </div>
+                  <div class="form-text text-muted ms-5 d-none" id="plannerOptionHorizontalSplitNotice">현재 창이 가로로 더 길 때만 사용할 수 있습니다.</div>
                   <div id="prayerViewOptions" class="d-none">
                     <hr/>
                     <button type="button" class="btn btn-sm btn-outline-secondary" id="rosaryLayoutResetButton">묵주 레이아웃 초기화</button>
@@ -444,6 +469,7 @@ let lineByLinePreference = true;
 let lineByLineEnabled = true;
 let ttsEnabled = false;
 let prayerStepIdCounter = 0;
+let horizontalSplitPreference = false;
 
 const rosaryPrayerTexts = {
   apostlesCreed: "╋ 전능하신 천주 성부, ◎ 천지의 창조주를 저는 믿나이다.\n그 외아들 우리 주 예수 그리스도님,\n성령으로 인하여 동정 마리아께 잉태되어 나시고,\n본시오 빌라도 통치 아래에서 고난을 받으시고,\n십자가에 못 박혀 돌아가시고 묻히셨으며,\n저승에 가시어 사흗날에 죽은 이들 가운데서 부활하시고,\n하늘에 올라 전능하신 천주 성부 오른편에 앉아 계시며,\n그리로부터 산 이와 죽은 이를 심판하러 오시리라 믿나이다.\n성령을 믿으며,\n거룩하고 보편된 교회와 모든 성인의 통공을 믿으며,\n죄의 용서와 육신의 부활을 믿으며,\n영원한 삶을 믿나이다. 아멘.",
@@ -819,6 +845,42 @@ function apply_line_by_line_effects(options = {}) {
   }
 }
 
+function is_landscape_orientation() {
+  return window.innerWidth > window.innerHeight;
+}
+
+function apply_horizontal_split_layout() {
+  const layout = $(".prayer-layout");
+  if (!layout.length) {
+    return;
+  }
+  const shouldSplit = horizontalSplitPreference && is_landscape_orientation();
+  layout.toggleClass("horizontal-split", shouldSplit);
+}
+
+function update_horizontal_split_option_state() {
+  const toggle = $("#plannerOptionHorizontalSplit");
+  if (!toggle.length) {
+    return;
+  }
+  const container = $("#plannerOptionHorizontalSplitContainer");
+  const notice = $("#plannerOptionHorizontalSplitNotice");
+  const landscape = is_landscape_orientation();
+  if (landscape) {
+    toggle.prop("checked", horizontalSplitPreference);
+    toggle.prop("disabled", false);
+  } else {
+    toggle.prop("checked", false);
+    toggle.prop("disabled", true);
+  }
+  if (container.length) {
+    container.toggleClass("opacity-50", !landscape);
+  }
+  if (notice.length) {
+    notice.toggleClass("d-none", landscape);
+  }
+}
+
 function advance_prayer_line() {
   if (!lineByLineEnabled) {
     return;
@@ -992,6 +1054,10 @@ function load_option_settings() {
 
   voiceAutoPreference = !!readSetting("option.voiceAuto", false);
 
+  horizontalSplitPreference = !!readSetting("option.horizontalSplit", false);
+  update_horizontal_split_option_state();
+  apply_horizontal_split_layout();
+
   const fullscreenPref = !!readSetting("option.fullscreen", false);
   if (document.fullscreenElement) {
     $("#plannerOptionFullscreen").prop("checked", true);
@@ -1039,6 +1105,8 @@ function sync_fullscreen_checkbox() {
   }
   checkbox.prop("checked", !!document.fullscreenElement);
   writeSetting("option.fullscreen", checkbox.is(":checked"));
+  apply_horizontal_split_layout();
+  update_horizontal_split_option_state();
 }
 
 document.addEventListener("fullscreenchange", sync_fullscreen_checkbox);
@@ -1158,6 +1226,8 @@ function enter_prayer_view() {
   $("#mainNavbar, #mainFooter").addClass("d-none");
   $("#plannerView").addClass("d-none");
   $("#prayerView").removeClass("d-none");
+  apply_horizontal_split_layout();
+  update_horizontal_split_option_state();
   const rosaryCanvasAPI = window.RosaryCanvas;
   if (!rosaryCanvasAPI || typeof rosaryCanvasAPI.create !== "function") {
     console.error("RosaryCanvas engine가 로드되지 않았습니다.");
@@ -1178,6 +1248,8 @@ function exit_prayer_view() {
   $("#mainNavbar, #mainFooter").removeClass("d-none");
   $("#prayerView").addClass("d-none");
   $("#plannerView").removeClass("d-none");
+  apply_horizontal_split_layout();
+  update_horizontal_split_option_state();
 }
 
 $(document).ready(function() {
@@ -1216,6 +1288,12 @@ $(document).ready(function() {
     writeSetting("option.fullscreen", enabled);
     toggle_fullscreen(enabled);
   });
+  $("#plannerOptionHorizontalSplit").on("change", function() {
+    const enabled = $(this).is(":checked");
+    horizontalSplitPreference = enabled;
+    writeSetting("option.horizontalSplit", enabled);
+    apply_horizontal_split_layout();
+  });
   $("#plannerStartButton").on("click", enter_prayer_view);
   $("#prayerExitButton").on("click", exit_prayer_view);
   $("#prayerPrevButton").on("click", retreat_prayer_step);
@@ -1237,6 +1315,11 @@ $(document).ready(function() {
     } else {
       close_prayer_options_overlay();
     }
+  });
+
+  $(window).on("resize", function() {
+    apply_horizontal_split_layout();
+    update_horizontal_split_option_state();
   });
 
   $(document).on("keydown", function(event) {
