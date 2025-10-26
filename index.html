@@ -1061,6 +1061,40 @@ $(document).ready(function() {
     }
   });
 
+  $(document).on("keydown", function(event) {
+    if (!$("body").hasClass("prayer-mode")) {
+      return;
+    }
+    const tag = event.target && event.target.tagName ? event.target.tagName.toLowerCase() : "";
+    if (tag === "input" || tag === "textarea" || event.target.isContentEditable) {
+      return;
+    }
+    let handled = false;
+    switch (event.key) {
+      case "ArrowLeft":
+      case "ArrowUp":
+        retreat_prayer_step();
+        handled = true;
+        break;
+      case "ArrowRight":
+      case "ArrowDown":
+        advance_prayer_step();
+        handled = true;
+        break;
+      case "Enter":
+        if (window.rosary && typeof window.rosary.reset === "function") {
+          window.rosary.reset();
+          handled = true;
+        }
+        break;
+      default:
+        break;
+    }
+    if (handled) {
+      event.preventDefault();
+    }
+  });
+
   render_prayer_step();
 
   if(window.location.hash == "") {
