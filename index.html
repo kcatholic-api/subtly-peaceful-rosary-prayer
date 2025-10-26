@@ -379,10 +379,6 @@
                 </button>
                 <div class="collapse" id="plannerOptions">
                   <div class="border-top px-3 pb-3 pt-3">
-                    <div class="form-check form-switch">
-                      <input class="form-check-input" type="checkbox" role="switch" id="plannerOptionLineByLine">
-                      <label class="form-check-label" for="plannerOptionLineByLine">기도문 한줄 씩 보여주기</label>
-                    </div>
                     <div class="form-check form-switch mt-2">
                       <input class="form-check-input" type="checkbox" role="switch" id="plannerOptionTts">
                       <label class="form-check-label" for="plannerOptionTts">TTS로 읽어 주기</label>
@@ -402,11 +398,6 @@
                     <input class="form-check-input" type="checkbox" role="switch" id="plannerOptionFullscreen">
                     <label class="form-check-label" for="plannerOptionFullscreen">전체 화면으로 보기</label>
                   </div>
-                  <div class="form-check form-switch mt-2" id="plannerOptionHorizontalSplitContainer">
-                    <input class="form-check-input" type="checkbox" role="switch" id="plannerOptionHorizontalSplit">
-                    <label class="form-check-label" for="plannerOptionHorizontalSplit">좌우 5:5로 보여주기</label>
-                  </div>
-                  <div class="form-text text-muted ms-5 d-none" id="plannerOptionHorizontalSplitNotice">현재 창이 가로로 더 길 때만 사용할 수 있습니다.</div>
                   <div id="prayerViewOptions" class="d-none">
                     <hr/>
                     <button type="button" class="btn btn-sm btn-outline-secondary" id="rosaryLayoutResetButton">묵주 레이아웃 초기화</button>
@@ -505,16 +496,15 @@ let voiceAutoPreference = false;
 let prayerSequence = [];
 let prayerSequenceIndex = 0;
 let prayerLineIndex = 0;
-let lineByLinePreference = true;
 let lineByLineEnabled = true;
 let ttsEnabled = false;
 let prayerStepIdCounter = 0;
-let horizontalSplitPreference = false;
 let rosaryLayoutRefreshHandle = null;
 let autoProgressEnabled = false;
 let autoProgressTimeoutHandle = null;
 const AUTO_PROGRESS_LINE_DELAY_MS = 0;
 const AUTO_PROGRESS_STEP_DELAY_MS = 100;
+const HORIZONTAL_SPLIT_ASPECT_THRESHOLD = 16 / 10;
 const ttsState = {
   supported: typeof window !== "undefined" && typeof window.speechSynthesis !== "undefined" && typeof window.SpeechSynthesisUtterance !== "undefined",
   voices: [],
@@ -786,14 +776,6 @@ function get_step_lines(step) {
   return step._lineCache.lines;
 }
 
-function sync_line_by_line_toggle() {
-  const toggle = $("#plannerOptionLineByLine");
-  if (!toggle.length) {
-    return;
-  }
-  toggle.prop("checked", lineByLineEnabled);
-}
-
 function render_prayer_navigation_state() {
   const hasSequence = prayerSequence.length > 0;
   const currentStep = hasSequence ? prayerSequence[prayerSequenceIndex] : null;
@@ -806,7 +788,6 @@ function render_prayer_navigation_state() {
   const prevButton = $("#prayerPrevButton");
   const linePrevButton = $("#prayerLinePrevButton");
   const lineNextButton = $("#prayerLineNextButton");
-  sync_line_by_line_toggle();
   const hideLineControls = !lineByLineEnabled;
   if (nextButton.length) {
     if (!hasSequence) {
@@ -1543,51 +1524,29 @@ function render_prayer_step() {
   render_prayer_navigation_state();
 }
 
-function set_line_by_line_enabled(enabled, options = {}) {
-  const { persist = true, triggerRender = true, allowAutoAdjust = true } = options;
-  const next = !!enabled;
-  lineByLinePreference = next;
-  if (persist) {
-    writeSetting("option.lineByLine", next);
-  }
-  const toggle = $("#plannerOptionLineByLine");
-  if (toggle.length) {
-    toggle.prop("checked", next);
-  }
-  apply_line_by_line_effects({ triggerRender, allowAutoAdjust });
-}
-
-function apply_line_by_line_effects(options = {}) {
+function apply_line_by_line_mode(enabled, options = {}) {
   const { triggerRender = true, allowAutoAdjust = true } = options;
-  const prevEnabled = lineByLineEnabled;
-  lineByLineEnabled = lineByLinePreference;
-  sync_line_by_line_toggle();
-  const linePrevButton = $("#prayerLinePrevButton");
-  const lineNextButton = $("#prayerLineNextButton");
-  const hideLineControls = !lineByLineEnabled;
-  if (linePrevButton.length) {
-    linePrevButton.toggleClass("d-none", hideLineControls);
-    if (hideLineControls) {
-      linePrevButton.prop("disabled", true);
+  const next = !!enabled;
+  const prev = lineByLineEnabled;
+  if (prev === next) {
+    update_voice_auto_option();
+    if (triggerRender) {
+      render_prayer_navigation_state();
     }
+    return;
   }
-  if (lineNextButton.length) {
-    lineNextButton.toggleClass("d-none", hideLineControls);
-    if (hideLineControls) {
-      lineNextButton.prop("disabled", true);
-    }
-  }
-  if (hideLineControls) {
+  lineByLineEnabled = next;
+  if (!lineByLineEnabled) {
     prayerLineIndex = 0;
   }
-  if (allowAutoAdjust && !prevEnabled && lineByLineEnabled) {
+  if (allowAutoAdjust && !prev && lineByLineEnabled) {
     const autoProgressCheckbox = $("#plannerOptionAutoProgress");
-  if (autoProgressCheckbox.length && !autoProgressCheckbox.is(":checked")) {
-    autoProgressCheckbox.prop("checked", true);
-    writeSetting("option.autoProgress", true);
-    autoProgressEnabled = true;
+    if (autoProgressCheckbox.length && !autoProgressCheckbox.is(":checked")) {
+      autoProgressCheckbox.prop("checked", true);
+      writeSetting("option.autoProgress", true);
+      autoProgressEnabled = true;
+    }
   }
-}
   update_voice_auto_option();
   if (triggerRender) {
     render_prayer_step();
@@ -1597,46 +1556,39 @@ function apply_line_by_line_effects(options = {}) {
 }
 
 function is_landscape_orientation() {
+  if (typeof window === "undefined") {
+    return false;
+  }
   return window.innerWidth > window.innerHeight;
 }
 
-function apply_horizontal_split_layout() {
-  const layout = $(".prayer-layout");
-  if (!layout.length) {
-    return;
+function get_viewport_aspect_ratio() {
+  if (typeof window === "undefined") {
+    return 1;
   }
-  const shouldSplit = horizontalSplitPreference && is_landscape_orientation();
-  const wasSplit = layout.hasClass("horizontal-split");
-  layout.toggleClass("horizontal-split", shouldSplit);
-  if (wasSplit !== shouldSplit) {
-    schedule_rosary_canvas_refresh();
-  }
-  if (shouldSplit && lineByLinePreference) {
-    set_line_by_line_enabled(false);
-  }
+  const height = Math.max(window.innerHeight, 1);
+  return window.innerWidth / height;
 }
 
-function update_horizontal_split_option_state() {
-  const toggle = $("#plannerOptionHorizontalSplit");
-  if (!toggle.length) {
-    return;
+function should_use_horizontal_split() {
+  if (!is_landscape_orientation()) {
+    return false;
   }
-  const container = $("#plannerOptionHorizontalSplitContainer");
-  const notice = $("#plannerOptionHorizontalSplitNotice");
-  const landscape = is_landscape_orientation();
-  if (landscape) {
-    toggle.prop("checked", horizontalSplitPreference);
-    toggle.prop("disabled", false);
-  } else {
-    toggle.prop("checked", false);
-    toggle.prop("disabled", true);
+  return get_viewport_aspect_ratio() >= HORIZONTAL_SPLIT_ASPECT_THRESHOLD;
+}
+
+function apply_horizontal_split_layout(options = {}) {
+  const { triggerRender = true, allowAutoAdjust = true } = options;
+  const shouldSplit = should_use_horizontal_split();
+  const layout = $(".prayer-layout");
+  if (layout.length) {
+    const wasSplit = layout.hasClass("horizontal-split");
+    layout.toggleClass("horizontal-split", shouldSplit);
+    if (wasSplit !== shouldSplit) {
+      schedule_rosary_canvas_refresh();
+    }
   }
-  if (container.length) {
-    container.toggleClass("opacity-50", !landscape);
-  }
-  if (notice.length) {
-    notice.toggleClass("d-none", landscape);
-  }
+  apply_line_by_line_mode(!shouldSplit, { triggerRender, allowAutoAdjust });
 }
 
 function schedule_rosary_canvas_refresh() {
@@ -1800,8 +1752,7 @@ function update_voice_auto_option() {
 }
 
 function load_option_settings() {
-  lineByLinePreference = !!readSetting("option.lineByLine", true);
-  lineByLineEnabled = lineByLinePreference;
+  const initialLineByLine = !should_use_horizontal_split();
 
   ttsEnabled = !!readSetting("option.tts", false);
   $("#plannerOptionTts").prop("checked", ttsEnabled);
@@ -1815,7 +1766,7 @@ function load_option_settings() {
   const autoPrefOriginal = !!readSetting("option.autoProgress", false);
   let autoPref = autoPrefOriginal;
   let persistAutoPref = false;
-  if (autoStoredRaw === null && (lineByLinePreference || ttsEnabled)) {
+  if (autoStoredRaw === null && (initialLineByLine || ttsEnabled)) {
     autoPref = true;
     persistAutoPref = true;
   }
@@ -1831,9 +1782,7 @@ function load_option_settings() {
 
   voiceAutoPreference = !!readSetting("option.voiceAuto", false);
 
-  horizontalSplitPreference = !!readSetting("option.horizontalSplit", false);
-  update_horizontal_split_option_state();
-  apply_horizontal_split_layout();
+  apply_horizontal_split_layout({ triggerRender: false, allowAutoAdjust: false });
 
   const fullscreenPref = !!readSetting("option.fullscreen", false);
   if (document.fullscreenElement) {
@@ -1842,7 +1791,6 @@ function load_option_settings() {
     $("#plannerOptionFullscreen").prop("checked", fullscreenPref);
   }
 
-  apply_line_by_line_effects({ triggerRender: false, allowAutoAdjust: false });
   update_voice_auto_option();
   handle_tts_enabled_change();
 }
@@ -1884,7 +1832,6 @@ function sync_fullscreen_checkbox() {
   checkbox.prop("checked", !!document.fullscreenElement);
   writeSetting("option.fullscreen", checkbox.is(":checked"));
   apply_horizontal_split_layout();
-  update_horizontal_split_option_state();
 }
 
 document.addEventListener("fullscreenchange", sync_fullscreen_checkbox);
@@ -2005,7 +1952,6 @@ function enter_prayer_view() {
   $("#plannerView").addClass("d-none");
   $("#prayerView").removeClass("d-none");
   apply_horizontal_split_layout();
-  update_horizontal_split_option_state();
   const rosaryCanvasAPI = window.RosaryCanvas;
   if (!rosaryCanvasAPI || typeof rosaryCanvasAPI.create !== "function") {
     console.error("RosaryCanvas engine가 로드되지 않았습니다.");
@@ -2029,7 +1975,6 @@ function exit_prayer_view() {
   $("#prayerView").addClass("d-none");
   $("#plannerView").removeClass("d-none");
   apply_horizontal_split_layout();
-  update_horizontal_split_option_state();
 }
 
 $(document).ready(function() {
@@ -2047,7 +1992,7 @@ $(document).ready(function() {
   $("#plannerOptionTts").on("change", function() {
     ttsEnabled = $(this).is(":checked");
     writeSetting("option.tts", ttsEnabled);
-    apply_line_by_line_effects();
+    apply_line_by_line_mode(lineByLineEnabled);
     handle_tts_enabled_change();
   });
   $("#plannerOptionAutoProgress").on("change", function() {
@@ -2055,9 +2000,6 @@ $(document).ready(function() {
     writeSetting("option.autoProgress", enabled);
     update_voice_auto_option();
     autoProgressEnabled = enabled;
-  });
-  $("#plannerOptionLineByLine").on("change", function() {
-    set_line_by_line_enabled($(this).is(":checked"));
   });
   $("#plannerOptionVoiceAuto").on("change", function() {
     voiceAutoPreference = $(this).is(":checked");
@@ -2068,12 +2010,6 @@ $(document).ready(function() {
     const enabled = $(this).is(":checked");
     writeSetting("option.fullscreen", enabled);
     toggle_fullscreen(enabled);
-  });
-  $("#plannerOptionHorizontalSplit").on("change", function() {
-    const enabled = $(this).is(":checked");
-    horizontalSplitPreference = enabled;
-    writeSetting("option.horizontalSplit", enabled);
-    apply_horizontal_split_layout();
   });
   $("#plannerStartButton").on("click", enter_prayer_view);
   $("#prayerExitButton").on("click", exit_prayer_view);
@@ -2100,7 +2036,6 @@ $(document).ready(function() {
 
   $(window).on("resize", function() {
     apply_horizontal_split_layout();
-    update_horizontal_split_option_state();
   });
 
   $(document).on("keydown", function(event) {
