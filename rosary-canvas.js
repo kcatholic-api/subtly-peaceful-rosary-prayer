@@ -103,6 +103,10 @@
     let nodes=[], links=[]; let dragging=null; let pointer={x:0,y:0};
     let highlightedId=null; let last=performance.now(); let animTime=0;
     let bgRadiusPx = 0;
+    const VIEW_MIN_SCALE = 1;
+    const VIEW_MAX_SCALE = 2.5;
+    let viewScale = VIEW_MIN_SCALE;
+    let viewOffset = { x: 0, y: 0 };
 
     const radiusOverrides = () => ({
       AVE: CFG.RADIUS_AVE, PATER: CFG.RADIUS_PATER, MEDAL: CFG.RADIUS_MEDAL
@@ -167,6 +171,75 @@
       context.closePath();
     }
 
+    function clampViewOffset(){
+      const s = viewScale || VIEW_MIN_SCALE;
+      if (!W || !H) {
+        viewOffset.x = 0;
+        viewOffset.y = 0;
+        return;
+      }
+      const viewWidth = W / s;
+      const viewHeight = H / s;
+      const maxOffsetX = Math.max(0, W - viewWidth);
+      const maxOffsetY = Math.max(0, H - viewHeight);
+      viewOffset.x = Math.min(Math.max(viewOffset.x, 0), maxOffsetX);
+      viewOffset.y = Math.min(Math.max(viewOffset.y, 0), maxOffsetY);
+    }
+
+    function resetView(){
+      viewScale = VIEW_MIN_SCALE;
+      viewOffset.x = 0;
+      viewOffset.y = 0;
+      clampViewOffset();
+    }
+
+    function screenToWorld(x, y){
+      const s = viewScale || VIEW_MIN_SCALE;
+      return {
+        x: viewOffset.x + x / s,
+        y: viewOffset.y + y / s
+      };
+    }
+
+    function setZoomAround(scaleFactor, focusX, focusY){
+      const currentScale = viewScale || VIEW_MIN_SCALE;
+      const newScale = Math.min(VIEW_MAX_SCALE, Math.max(VIEW_MIN_SCALE, currentScale * scaleFactor));
+      if (Math.abs(newScale - currentScale) < 1e-6) {
+        return false;
+      }
+      const worldFocus = screenToWorld(focusX, focusY);
+      viewScale = newScale;
+      viewOffset.x = worldFocus.x - focusX / viewScale;
+      viewOffset.y = worldFocus.y - focusY / viewScale;
+      clampViewOffset();
+      return true;
+    }
+
+    function ensureNodeInView(node){
+      if (!node || !W || !H) {
+        return;
+      }
+      const s = viewScale || VIEW_MIN_SCALE;
+      const viewWidth = W / s;
+      const viewHeight = H / s;
+      const margin = Math.max(node.radius * 2.5, 24 / s);
+      let ox = viewOffset.x;
+      let oy = viewOffset.y;
+      if (node.x < ox + margin) {
+        ox = node.x - margin;
+      } else if (node.x > ox + viewWidth - margin) {
+        ox = node.x - viewWidth + margin;
+      }
+      if (node.y < oy + margin) {
+        oy = node.y - margin;
+      } else if (node.y > oy + viewHeight - margin) {
+        oy = node.y - viewHeight + margin;
+      }
+      viewOffset.x = ox;
+      viewOffset.y = oy;
+      clampViewOffset();
+    }
+
     function drawHighlightHalo(node, time){
       const pulseRate = CFG.HIGHLIGHT_PULSE_RATE || 2.4;
       const oscillation = (Math.sin(time * pulseRate) + 1) * 0.5;
@@ -221,10 +294,12 @@
       } else {
         bgRadiusPx = 12; // 기본 폰트 16px 가정 → 0.75em
       }
+      clampViewOffset();
     }
 
     function initRosary(){
       nodes=[]; links=[];
+      resetView();
       const CX = W/2;
       const CY = H*0.375;
       const R = Math.min(W, H) * 0.35; // 기본 구조는 비율 기반, 절대치(구슬/십자가)는 CFG 스케일 사용
@@ -300,16 +375,23 @@
     }
 
     function draw(time=0){
+      ctx.setTransform(DPR,0,0,DPR,0,0);
       ctx.clearRect(0,0,W,H);
-      const bg = ctx.createRadialGradient(W*0.5, H*0.35, Math.max(W,H)*0.05, W*0.5, H*0.4, Math.max(W,H)*0.8);
-      bg.addColorStop(0, CFG.COLOR_BG_INNER);
-      bg.addColorStop(1, CFG.COLOR_BG_OUTER);
       ctx.save();
       ctx.beginPath();
       roundedRectPath(ctx, 0, 0, W, H, bgRadiusPx);
+      ctx.clip();
+
+      ctx.save();
+      ctx.scale(viewScale, viewScale);
+      ctx.translate(-viewOffset.x, -viewOffset.y);
+
+      const bg = ctx.createRadialGradient(W*0.5, H*0.35, Math.max(W,H)*0.05, W*0.5, H*0.4, Math.max(W,H)*0.8);
+      bg.addColorStop(0, CFG.COLOR_BG_INNER);
+      bg.addColorStop(1, CFG.COLOR_BG_OUTER);
       ctx.fillStyle = bg;
-      ctx.fill();
-      ctx.restore();
+      ctx.fillRect(0, 0, W, H);
+
       ctx.lineWidth=3; ctx.strokeStyle=CFG.COLOR_STRING; ctx.beginPath();
       const loop=collectLoop(); const medal=nodes[54];
       for(let i=0;i<loop.length-1;i++){ const a=loop[i], b=loop[i+1]; ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); }
@@ -342,7 +424,10 @@
         }
       }
       const crossAnchor = nodes[nodes.length-1]; const crossHi = (crossAnchor.node_id===highlightedId); drawCross(crossAnchor.x, crossAnchor.y, crossSize(), crossHi);
-      if (dragging){ const n=dragging.node; ctx.beginPath(); ctx.arc(n.x,n.y,n.radius+3,0,Math.PI*2); ctx.strokeStyle=CFG.COLOR_DRAG; ctx.lineWidth=2; ctx.stroke(); }
+      if (dragging && dragging.mode === 'node'){ const n=dragging.node; ctx.beginPath(); ctx.arc(n.x,n.y,n.radius+3,0,Math.PI*2); ctx.strokeStyle=CFG.COLOR_DRAG; ctx.lineWidth=2; ctx.stroke(); }
+
+      ctx.restore();
+      ctx.restore();
     }
 
     function PO(e){ const r=canvas.getBoundingClientRect(); if(e.touches&&e.touches[0]) return {x:e.touches[0].clientX-r.left, y:e.touches[0].clientY-r.top}; return {x:e.clientX-r.left, y:e.clientY-r.top}; }
@@ -371,16 +456,99 @@
       _raf = requestAnimationFrame(loopRAF);
     }
     function reset(){ initRosary(); }
-    function highlight_rosary_step(id){ const n = nodes.find(v=> v.node_id===id); if(!n){ highlightedId=null; return false; } highlightedId=id; return true; }
+    function highlight_rosary_step(id){
+      const n = nodes.find(v=> v.node_id===id);
+      if(!n){
+        highlightedId=null;
+        return false;
+      }
+      highlightedId=id;
+      ensureNodeInView(n);
+      return true;
+    }
     function destroy(){ if(_raf) cancelAnimationFrame(_raf); _raf=null; nodes=[]; links=[]; }
     function getConfig(){ return { ...CFG, SCALE, canvasSize:{W,H} }; }
 
     // 이벤트 바인딩(포인터)
-    canvas.addEventListener('pointerdown', e=>{ const p=PO(e); pointer=p; const n=nearestNode(p.x,p.y); if(!n) return; dragging={node:n, ox:n.x-p.x, oy:n.y-p.y}; n.px=n.x=p.x+dragging.ox; n.py=n.y=p.y+dragging.oy; });
-    canvas.addEventListener('pointermove', e=>{ const p=PO(e); pointer=p; if(dragging){ const n=dragging.node; n.px=n.x; n.py=n.y; n.x=p.x+dragging.ox; n.y=p.y+dragging.oy; }});
-    const endDrag=()=>{ if(dragging){ dragging.node.px=dragging.node.x; dragging.node.py=dragging.node.y; } dragging=null; };
-    canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
-    canvas.addEventListener('contextmenu', e=>{ e.preventDefault(); const p=PO(e); const n=nearestNode(p.x,p.y,22); if(n){ n.pinned=!n.pinned; showPinTip(p.x,p.y); }});
+    canvas.addEventListener('pointerdown', e=>{
+      const p=PO(e); pointer=p;
+      const selectionRadius = 28 / (viewScale || VIEW_MIN_SCALE);
+      const world = screenToWorld(p.x, p.y);
+      const n=nearestNode(world.x, world.y, selectionRadius);
+      const pointerId = (typeof e.pointerId === 'number') ? e.pointerId : null;
+      if(n){
+        dragging={ mode:'node', node:n, ox: n.x - world.x, oy: n.y - world.y };
+        dragging.pointerId = pointerId;
+        n.px=n.x=world.x+dragging.ox; n.py=n.y=world.y+dragging.oy;
+        if (pointerId !== null && canvas.setPointerCapture){
+          try { canvas.setPointerCapture(pointerId); } catch(_) {}
+        }
+        e.preventDefault();
+        return;
+      }
+      if (viewScale > VIEW_MIN_SCALE){
+        dragging={
+          mode:'pan',
+          startScreen:{x:p.x, y:p.y},
+          startOffsetX:viewOffset.x,
+          startOffsetY:viewOffset.y
+        };
+        dragging.pointerId = pointerId;
+        if (pointerId !== null && canvas.setPointerCapture){
+          try { canvas.setPointerCapture(pointerId); } catch(_) {}
+        }
+        e.preventDefault();
+      }
+    });
+    canvas.addEventListener('pointermove', e=>{
+      const p=PO(e); pointer=p;
+      if(!dragging) return;
+      if (dragging.mode === 'node'){
+        const world = screenToWorld(p.x, p.y);
+        const n=dragging.node;
+        n.px=n.x;
+        n.py=n.y;
+        n.x=world.x+dragging.ox;
+        n.y=world.y+dragging.oy;
+      } else if (dragging.mode === 'pan'){
+        const dx = p.x - dragging.startScreen.x;
+        const dy = p.y - dragging.startScreen.y;
+        const s = viewScale || VIEW_MIN_SCALE;
+        viewOffset.x = dragging.startOffsetX - dx / s;
+        viewOffset.y = dragging.startOffsetY - dy / s;
+        clampViewOffset();
+      }
+    });
+    function endDrag(e){
+      if(!dragging) return;
+      if (dragging.mode === 'node'){
+        dragging.node.px = dragging.node.x;
+        dragging.node.py = dragging.node.y;
+      }
+      if (dragging.pointerId !== null && canvas.releasePointerCapture){
+        try { canvas.releasePointerCapture(dragging.pointerId); } catch(_) {}
+      }
+      dragging=null;
+    }
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+    canvas.addEventListener('contextmenu', e=>{
+      e.preventDefault();
+      const p=PO(e);
+      const world = screenToWorld(p.x, p.y);
+      const selectionRadius = 22 / (viewScale || VIEW_MIN_SCALE);
+      const n=nearestNode(world.x, world.y, selectionRadius);
+      if(n){ n.pinned=!n.pinned; showPinTip(p.x,p.y); }
+    });
+    canvas.addEventListener('wheel', e=>{
+      if (typeof e.deltaY !== 'number') {
+        return;
+      }
+      e.preventDefault();
+      const p=PO(e);
+      const factor = e.deltaY < 0 ? 1.1 : 0.9;
+      setZoomAround(factor, p.x, p.y);
+    }, { passive: false });
 
     // 크기 변경 즉시 반영
     const onResize = ()=>{ const prevScale=SCALE; resize(); const newScale=SCALE; if (Math.abs(newScale - prevScale) > 1e-6){ initRosary(); } };

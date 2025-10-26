@@ -572,11 +572,9 @@ function create_concluding_steps() {
 
 function create_decade_steps({ mysteryTitle, decadeIndex, decadeLabel, meditation, hailMaryCount }) {
   const steps = [];
-  console.log('create', mysteryTitle , decadeIndex, decadeLabel, meditation, hailMaryCount);
   var pater_highlight = 'pater-'+(decadeIndex-1);
   if (decadeIndex == 0)
     pater_highlight = 'medal';
-  console.log(`${decadeLabel} 묵상`,pater_highlight)
   steps.push({
     type: "meditation",
     mysteryTitle,
@@ -593,7 +591,6 @@ function create_decade_steps({ mysteryTitle, decadeIndex, decadeLabel, meditatio
     content: rosaryPrayerTexts.ourFather,
     highlight: pater_highlight
   });
-  console.log(pater_highlight);
   for (let i = 1; i <= hailMaryCount; i += 1) {
     steps.push({
       type: "prayer",
@@ -604,7 +601,6 @@ function create_decade_steps({ mysteryTitle, decadeIndex, decadeLabel, meditatio
       highlight: 'ave-'+decadeIndex+'-'+(i-1),
       progressLabel: `${i}/${hailMaryCount}`
     });
-    console.log('ave-'+decadeIndex+'-'+(i-1));
   }
   pater_highlight = 'pater-'+(decadeIndex);
   if((decadeIndex+1) == 5)
@@ -617,7 +613,6 @@ function create_decade_steps({ mysteryTitle, decadeIndex, decadeLabel, meditatio
     content: rosaryPrayerTexts.gloryBe,
     highlight: pater_highlight
   });
-    console.log(pater_highlight);
   steps.push({
     type: "prayer",
     mysteryTitle,
@@ -626,7 +621,6 @@ function create_decade_steps({ mysteryTitle, decadeIndex, decadeLabel, meditatio
     content: rosaryPrayerTexts.fatimaPrayer,
     highlight: pater_highlight
   });
-    console.log(pater_highlight);
   return steps;
 }
 
@@ -995,7 +989,12 @@ function enter_prayer_view() {
   $("#mainNavbar, #mainFooter").addClass("d-none");
   $("#plannerView").addClass("d-none");
   $("#prayerView").removeClass("d-none");
-  window.rosary = RosaryCanvas.create(document.getElementById('rosary-canvas'));
+  const rosaryCanvasAPI = window.RosaryCanvas;
+  if (!rosaryCanvasAPI || typeof rosaryCanvasAPI.create !== "function") {
+    console.error("RosaryCanvas engine가 로드되지 않았습니다.");
+    return;
+  }
+  window.rosary = rosaryCanvasAPI.create(document.getElementById('rosary-canvas'));
   window.rosary.reset();
 
 }
@@ -1099,7 +1098,6 @@ $(document).ready(function() {
 
   if(window.location.hash == "") {
     if(localStorage.getItem(startup_dialog_version) != "no") {
-      console.log("show startup");
       $("#startupModal").modal("show");
     }
   }
