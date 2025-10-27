@@ -72,7 +72,7 @@
         height: calc(100% - 6.5rem);
         margin-top: 3rem;
         margin-bottom: 0;
-        padding-bottom: 6.5rem;
+        padding-bottom: 1.5rem;
       }
       .prayer-layout.horizontal-split .prayer-pane-top {
         height: 100%;
@@ -122,6 +122,7 @@
         justify-content: flex-start;
         align-items: stretch;
         text-align: center;
+        margin-top: 1.5rem;
       }
       .prayer-step-title {
         text-align: left;
@@ -197,35 +198,6 @@
       }
       .prayer-options-overlay #plannerOptions {
         border-top: none;
-      }
-      .prayer-options-toggle-button {
-        background-color: #ffffff;
-        border: 1px solid rgba(0, 0, 0, 0.08);
-        border-radius: 0.75rem;
-        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.08);
-        padding: 0.5rem 0.9rem;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.5rem;
-        white-space: nowrap;
-        font-weight: 600;
-        color: #212529;
-      }
-      .prayer-options-toggle-button:hover {
-        border-color: rgba(13, 110, 253, 0.6);
-        background-color: #ffffff;
-        box-shadow: 0 0.5rem 1.5rem rgba(13, 110, 253, 0.15);
-      }
-      .prayer-options-toggle-button.active {
-        border-color: rgba(13, 110, 253, 0.6);
-        background-color: #ffffff;
-        box-shadow: 0 0.5rem 1.5rem rgba(13, 110, 253, 0.15);
-      }
-      .prayer-options-toggle-button:focus-visible {
-        background-color: #ffffff;
-        outline: 2px solid rgba(13, 110, 253, 0.6);
-        outline-offset: 2px;
       }
       #prayerOptionsOverlay .prayer-overlay-active .border-top {
         border-top-width: 0;
@@ -528,7 +500,7 @@
       <div class="prayer-controls-options">
         <div class="prayer-options-container">
           <div id="prayerOptionsOverlay" class="prayer-options-overlay d-none" aria-hidden="true"></div>
-          <button type="button" class="btn prayer-options-toggle-button btn-sm d-inline-flex align-items-center gap-2" id="prayerOptionsToggleButton" aria-expanded="false" aria-controls="prayerOptionsOverlay">
+          <button type="button" class="btn btn-light d-inline-flex align-items-center gap-2" id="prayerOptionsToggleButton" aria-expanded="false" aria-controls="prayerOptionsOverlay">
             <span class="fw-semibold">옵션</span>
             <i class="bi bi-chevron-up" id="prayerOptionsToggleCaret" aria-hidden="true"></i>
           </button>
