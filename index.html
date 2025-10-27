@@ -34,9 +34,6 @@
         min-height: 0;
         color: #f8f9fa;
       }
-      .prayer-pane-top .prayer-metadata h3 {
-        color: #f1ede7;
-      }
       .prayer-pane-top .prayer-metadata .text-muted {
         color: rgba(241, 237, 231, 0.8) !important;
       }
@@ -95,8 +92,8 @@
         z-index: 1200;
       }
       .prayer-pane-bottom {
-        background-color: #ffffff;
-        border: 1px solid #dee2e6;
+        background-color: rgba(248, 240, 226, 0.97);
+        border: 1px solid rgba(255, 255, 255, 0.55);
         border-radius: 0.75rem;
         display: flex;
         flex-direction: column;
@@ -153,7 +150,7 @@
         max-width: 100%;
         --prayer-karaoke-progress: 0%;
         --prayer-karaoke-transition: 0.18s;
-        --prayer-karaoke-highlight: #0d6efd;
+        --prayer-karaoke-highlight: #5d4f0e;
         --prayer-karaoke-base: #212529;
         color: var(--prayer-karaoke-base);
       }
@@ -357,14 +354,13 @@
           <div class="card-body">
             <h2 class="card-title text-center mb-4">오늘의 묵주 기도</h2>
             <p class="text-center text-secondary mb-2">오늘 함께 바칠 신비를 선택해 보세요.</p>
-            <p class="text-center text-muted small mb-4">월·토 환희 | 화·금 고통 | 수·일 영광 | 목요일 빛의 신비</p>
             <div class="row gy-3">
               <div class="col-12 col-sm-6">
                 <div class="form-check border rounded p-3 h-100 d-flex align-items-center justify-content-between">
                   <div class="d-flex align-items-center">
                     <input class="form-check-input me-2" type="checkbox" value="환의의 신비" id="plannerJoyful">
                     <label class="form-check-label fw-semibold mb-0" for="plannerJoyful">
-                      환의의 신비
+                      환의의 신비 (월·토요일)
                     </label>
                   </div>
                   <select class="form-select form-select-sm w-auto text-center" id="plannerJoyfulCount" aria-label="환의의 신비 단수 선택" disabled>
@@ -381,7 +377,7 @@
                   <div class="d-flex align-items-center">
                     <input class="form-check-input me-2" type="checkbox" value="고통의 신비" id="plannerSorrowful">
                     <label class="form-check-label fw-semibold mb-0" for="plannerSorrowful">
-                      고통의 신비
+                      고통의 신비 (화·금요일)
                     </label>
                   </div>
                   <select class="form-select form-select-sm w-auto text-center" id="plannerSorrowfulCount" aria-label="고통의 신비 단수 선택" disabled>
@@ -398,7 +394,7 @@
                   <div class="d-flex align-items-center">
                     <input class="form-check-input me-2" type="checkbox" value="영광의 신비" id="plannerGlorious">
                     <label class="form-check-label fw-semibold mb-0" for="plannerGlorious">
-                      영광의 신비
+                      영광의 신비 (수·일요일)
                     </label>
                   </div>
                   <select class="form-select form-select-sm w-auto text-center" id="plannerGloriousCount" aria-label="영광의 신비 단수 선택" disabled>
@@ -415,7 +411,7 @@
                   <div class="d-flex align-items-center">
                     <input class="form-check-input me-2" type="checkbox" value="빛의 신비" id="plannerLuminous">
                     <label class="form-check-label fw-semibold mb-0" for="plannerLuminous">
-                      빛의 신비
+                      빛의 신비 (목요일)
                     </label>
                   </div>
                   <select class="form-select form-select-sm w-auto text-center" id="plannerLuminousCount" aria-label="빛의 신비 단수 선택" disabled>
@@ -480,14 +476,14 @@
         <canvas id="rosary-canvas" style="width:100%;height:100%"></canvas>
         <div class="prayer-metadata position-absolute top-0 start-0 m-3">
           <div class="d-flex align-items-baseline flex-wrap gap-2">
-            <h3 class="fw-bold mb-0" id="prayerCurrentMystery">환의의 신비</h3>
+            <h3 class="fw-bold mb-0 text-muted" id="prayerCurrentMystery">환의의 신비</h3>
             <div class="fw-semibold fs-5 text-muted" id="prayerCurrentDecade">1단</div>
           </div>
         </div>
       </div>
       <div class="prayer-pane-bottom">
         <div class="prayer-metadata position-absolute top-0 start-0 m-3">
-          <p class="text-secondary fw-semibold mb-3" id="prayerCurrentStepTitle">기도문 제목</p>
+          <p class="text-dark fw-semibold mb-3" id="prayerCurrentStepTitle">기도문 제목</p>
         </div>
         <button type="button" class="btn btn-secondary btn-sm prayer-line-button position-absolute top-0 end-0 m-3" id="prayerLinePrevButton" aria-label="이전 줄">▲</button>
         <div class="prayer-lyric-area px-4 py-4">
