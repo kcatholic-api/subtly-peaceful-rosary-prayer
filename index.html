@@ -578,6 +578,21 @@ const ttsState = {
   pendingRequest: null
 };
 let ttsSupportAlerted = false;
+const voiceAutoState = {
+  supported: typeof window !== "undefined" && (typeof window.SpeechRecognition !== "undefined" || typeof window.webkitSpeechRecognition !== "undefined"),
+  recognition: null,
+  running: false,
+  shouldListen: false,
+  pendingTranscriptNormalized: "",
+  currentLineNormalized: "",
+  currentLineLength: 0,
+  currentLineElement: null,
+  restartTimer: null,
+  lastProgress: 0,
+  matchedCharCount: 0
+};
+const VOICE_AUTO_MATCH_THRESHOLD = 0.92;
+const VOICE_AUTO_RESTART_DELAY_MS = 400;
 
 const rosaryPrayerTexts = {
   apostlesCreed: "╋ 전능하신 천주 성부, ◎ 천지의 창조주를 저는 믿나이다.\n그 외아들 우리 주 예수 그리스도님,\n성령으로 인하여 동정 마리아께 잉태되어 나시고,\n본시오 빌라도 통치 아래에서 고난을 받으시고,\n십자가에 못 박혀 돌아가시고 묻히셨으며,\n저승에 가시어 사흗날에 죽은 이들 가운데서 부활하시고,\n하늘에 올라 전능하신 천주 성부 오른편에 앉아 계시며,\n그리로부터 산 이와 죽은 이를 심판하러 오시리라 믿나이다.\n성령을 믿으며,\n거룩하고 보편된 교회와 모든 성인의 통공을 믿으며,\n죄의 용서와 육신의 부활을 믿으며,\n영원한 삶을 믿나이다. 아멘.",
@@ -1003,6 +1018,66 @@ function compute_karaoke_thresholds(originalText, charNodes) {
   return thresholds;
 }
 
+function get_speech_recognition_constructor() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
+function normalize_text_for_voice(text) {
+  if (typeof text !== "string") {
+    return "";
+  }
+  return text
+    .replace(/\r?\n/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/[^\p{Letter}\p{Number}]+/gu, "")
+    .toLowerCase();
+}
+
+function strip_special_for_log(text) {
+  if (typeof text !== "string") {
+    return "";
+  }
+  return text
+    .replace(/[^\p{Letter}\p{Number}\s]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function compute_prefix_match(base, sample) {
+  const max = Math.min(base.length, sample.length);
+  let index = 0;
+  while (index < max && base.charAt(index) === sample.charAt(index)) {
+    index += 1;
+  }
+  return index;
+}
+
+function find_best_prefix_alignment(line, transcript) {
+  const result = { drop: transcript.length, length: 0 };
+  if (!line || !transcript) {
+    return result;
+  }
+  const transcriptLength = transcript.length;
+  for (let start = 0; start < transcriptLength; start += 1) {
+    const candidate = transcript.slice(start);
+    if (!candidate.length) {
+      continue;
+    }
+    const matchLength = compute_prefix_match(line, candidate);
+    if (matchLength > result.length) {
+      result.length = matchLength;
+      result.drop = start;
+      if (matchLength === candidate.length) {
+        break;
+      }
+    }
+  }
+  return result;
+}
+
 function get_current_karaoke_element() {
   return $("#prayerCurrentStepContent .prayer-line-current").first();
 }
@@ -1385,6 +1460,374 @@ function clear_auto_progress_timer() {
   }
 }
 
+function voice_auto_is_supported() {
+  if (!voiceAutoState.supported) {
+    return false;
+  }
+  return !!get_speech_recognition_constructor();
+}
+
+function voice_auto_should_listen() {
+  if (!voice_auto_is_supported()) {
+    return false;
+  }
+  if (!voiceAutoPreference || !autoProgressEnabled) {
+    return false;
+  }
+  if (!$("body").hasClass("prayer-mode")) {
+    return false;
+  }
+  return true;
+}
+
+function voice_auto_reset_transcript(options = {}) {
+  const { resetProgress = true } = options;
+  voiceAutoState.pendingTranscriptNormalized = "";
+  if (resetProgress) {
+    voiceAutoState.lastProgress = 0;
+    voiceAutoState.matchedCharCount = 0;
+  }
+}
+
+function voice_auto_prepare_current_line(options = {}) {
+  const { resetTranscript = true } = options;
+  const currentLine = get_current_karaoke_element();
+  voiceAutoState.currentLineElement = currentLine.length ? currentLine : null;
+  if (!voiceAutoState.currentLineElement) {
+    voiceAutoState.currentLineNormalized = "";
+    voiceAutoState.currentLineLength = 0;
+    if (resetTranscript) {
+      voice_auto_reset_transcript();
+    }
+    return;
+  }
+  const rawText = voiceAutoState.currentLineElement.attr("data-raw-text") || voiceAutoState.currentLineElement.text() || "";
+  voiceAutoState.currentLineNormalized = normalize_text_for_voice(rawText);
+  voiceAutoState.currentLineLength = voiceAutoState.currentLineNormalized.length;
+  if (resetTranscript) {
+    voice_auto_reset_transcript();
+  } else {
+    voiceAutoState.matchedCharCount = Math.min(
+      Math.max(0, voiceAutoState.matchedCharCount || 0),
+      voiceAutoState.currentLineLength
+    );
+    voiceAutoState.lastProgress = voiceAutoState.currentLineLength > 0
+      ? Math.min(1, voiceAutoState.matchedCharCount / voiceAutoState.currentLineLength)
+      : 0;
+  }
+}
+
+function voice_auto_handle_start() {
+  voiceAutoState.running = true;
+  if (voiceAutoState.restartTimer) {
+    clearTimeout(voiceAutoState.restartTimer);
+    voiceAutoState.restartTimer = null;
+  }
+}
+
+function voice_auto_schedule_restart() {
+  if (voiceAutoState.restartTimer) {
+    clearTimeout(voiceAutoState.restartTimer);
+  }
+  if (!voiceAutoState.shouldListen) {
+    voiceAutoState.restartTimer = null;
+    return;
+  }
+  voiceAutoState.restartTimer = setTimeout(() => {
+    voiceAutoState.restartTimer = null;
+    if (voiceAutoState.recognition && !voiceAutoState.running) {
+      try {
+        voiceAutoState.recognition.start();
+      } catch (error) {
+        console.warn("음성 인식 재시작 실패:", error);
+      }
+    }
+  }, VOICE_AUTO_RESTART_DELAY_MS);
+}
+
+function voice_auto_handle_end() {
+  voiceAutoState.running = false;
+  if (voiceAutoState.shouldListen) {
+    voice_auto_schedule_restart();
+  }
+}
+
+function voice_auto_handle_error(event) {
+  console.warn("음성 인식 오류:", event && event.error ? event.error : event);
+  if (!event || !event.error) {
+    return;
+  }
+  if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+    voiceAutoState.supported = false;
+    update_voice_auto_option();
+    stop_voice_auto_listener({ resetTranscript: true });
+  }
+}
+
+function voice_auto_handle_result(event) {
+  if (!voiceAutoState.shouldListen) {
+    return;
+  }
+  if (!event || !event.results) {
+    return;
+  }
+  const interimParts = [];
+  const finalParts = [];
+  for (let i = event.resultIndex || 0; i < event.results.length; i += 1) {
+    const result = event.results[i];
+    if (!result || !result.length) {
+      continue;
+    }
+    const alternative = result[0];
+    const text = (alternative && alternative.transcript ? alternative.transcript : "").trim();
+    if (!text) {
+      continue;
+    }
+    if (result.isFinal) {
+      finalParts.push(text);
+    } else {
+      interimParts.push(text);
+    }
+  }
+  finalParts.forEach((part) => {
+    const normalized = normalize_text_for_voice(part);
+    if (normalized.length) {
+      voiceAutoState.pendingTranscriptNormalized += normalized;
+    }
+  });
+  const interimText = interimParts.join(" ").trim();
+  const interimNormalized = normalize_text_for_voice(interimText);
+  const rawTranscript = finalParts.length ? finalParts.join(" ").trim() : interimText;
+  const normalizedTranscript = voiceAutoState.pendingTranscriptNormalized + interimNormalized;
+  if (!rawTranscript && !normalizedTranscript.length) {
+    return;
+  }
+  voice_auto_apply_transcript({
+    rawTranscript,
+    normalizedTranscript
+  });
+}
+
+function voice_auto_apply_transcript(payload) {
+  const isStringPayload = typeof payload === "string";
+  const rawTranscript = isStringPayload ? payload : (payload && typeof payload.rawTranscript === "string" ? payload.rawTranscript : "");
+  const normalizedTranscript = isStringPayload ? normalize_text_for_voice(payload) : (payload && typeof payload.normalizedTranscript === "string" ? payload.normalizedTranscript : "");
+  if (!voiceAutoState.shouldListen) {
+    return;
+  }
+  if (!voiceAutoState.currentLineElement || !voiceAutoState.currentLineElement.length) {
+    voice_auto_prepare_current_line({ resetTranscript: false });
+  }
+  const lineElement = voiceAutoState.currentLineElement;
+  if (!lineElement || !lineElement.length) {
+    return;
+  }
+  const lineLength = voiceAutoState.currentLineLength;
+  if (!lineLength) {
+    voice_auto_complete_current_line();
+    return;
+  }
+  if (!normalizedTranscript.length) {
+    return;
+  }
+  const matchedChars = Math.min(
+    Math.max(0, voiceAutoState.matchedCharCount || 0),
+    lineLength
+  );
+  const unhighlightedLine = voiceAutoState.currentLineNormalized.slice(matchedChars);
+  if (!unhighlightedLine.length) {
+    voice_auto_complete_current_line();
+    return;
+  }
+  const displayCharNodes = lineElement.data("karaokeChars");
+  const collectDisplayText = (start, end) => {
+    if (!Array.isArray(displayCharNodes) || !displayCharNodes.length) {
+      return "";
+    }
+    let buffer = "";
+    const safeStart = Math.max(0, start);
+    const safeEnd = Math.min(displayCharNodes.length, Math.max(safeStart, end));
+    for (let i = safeStart; i < safeEnd; i += 1) {
+      const node = displayCharNodes[i];
+      if (node && typeof node.textContent === "string") {
+        buffer += node.textContent;
+      }
+    }
+    return buffer;
+  };
+  const previousHighlightedCount = voiceAutoState.currentLineElement.data("karaokeHighlightedCount") || 0;
+  let remainingDisplayText = "";
+  if (Array.isArray(displayCharNodes) && displayCharNodes.length) {
+    remainingDisplayText = collectDisplayText(previousHighlightedCount, displayCharNodes.length).trim();
+  }
+  if (!remainingDisplayText) {
+    const rawLine = voiceAutoState.currentLineElement.attr("data-raw-text") || "";
+    remainingDisplayText = rawLine.trim() || unhighlightedLine;
+  }
+  const gatherMatchedDisplayText = (endCount) => {
+    if (!Array.isArray(displayCharNodes) || !displayCharNodes.length) {
+      return voiceAutoState.currentLineElement.text().trim().slice(0, endCount) || "";
+    }
+    return collectDisplayText(0, endCount).trim();
+  };
+  const logMatchResult = (status, matchedText, newlyMatchedText) => {
+    const recognizedLog = strip_special_for_log(rawTranscript || normalizedTranscript) || "(없음)";
+    const remainingLog = strip_special_for_log(remainingDisplayText) || "(없음)";
+    const matchedLog = strip_special_for_log(matchedText || "");
+    const newlyMatchedLog = strip_special_for_log(newlyMatchedText || "");
+    console.log("인식된 문장:", recognizedLog);
+    console.log("매치할 문장:", remainingLog);
+    console.log("매치 결과:", `${matchedLog || "(일치 없음)"} (${status})`);
+    if (newlyMatchedLog) {
+      console.log("신규 매치:", newlyMatchedLog);
+    }
+  };
+  const alignment = find_best_prefix_alignment(unhighlightedLine, normalizedTranscript);
+  const alignmentLength = alignment.length || 0;
+  if (alignmentLength <= 0) {
+    const matchedDisplayText = gatherMatchedDisplayText(previousHighlightedCount);
+    logMatchResult("실패", matchedDisplayText, "");
+    return;
+  }
+  const targetMatchedChars = Math.min(lineLength, matchedChars + alignmentLength);
+  const newMatchedChars = Math.max(matchedChars, targetMatchedChars);
+  let ratio = lineLength > 0 ? newMatchedChars / lineLength : 0;
+  if (ratio < voiceAutoState.lastProgress) {
+    ratio = voiceAutoState.lastProgress;
+  }
+  ratio = Math.min(1, ratio);
+  lineElement.removeClass("karaoke-complete").addClass("karaoke-armed");
+  set_karaoke_progress(lineElement, ratio);
+  voiceAutoState.lastProgress = ratio;
+  const ratioMatchedChars = Math.min(lineLength, Math.round(ratio * lineLength));
+  voiceAutoState.matchedCharCount = Math.max(matchedChars, newMatchedChars, ratioMatchedChars);
+  voiceAutoState.matchedCharCount = Math.min(lineLength, voiceAutoState.matchedCharCount);
+  const updatedHighlightedCount = voiceAutoState.currentLineElement.data("karaokeHighlightedCount") || 0;
+  const newlyMatchedTextRaw = collectDisplayText(previousHighlightedCount, updatedHighlightedCount).trim();
+  const deltaMatched = Math.max(0, voiceAutoState.matchedCharCount - matchedChars);
+  if (deltaMatched > 0) {
+    const pendingLengthBefore = voiceAutoState.pendingTranscriptNormalized.length;
+    const consumeFromPending = Math.min(alignmentLength, pendingLengthBefore);
+    if (consumeFromPending > 0) {
+      voiceAutoState.pendingTranscriptNormalized = voiceAutoState.pendingTranscriptNormalized.slice(consumeFromPending);
+    }
+  }
+  const matchStatus = ratio >= 1 || ratio >= VOICE_AUTO_MATCH_THRESHOLD
+    ? "성공"
+    : "진행 중";
+  const matchedDisplayText = gatherMatchedDisplayText(updatedHighlightedCount);
+  logMatchResult(matchStatus, matchedDisplayText, newlyMatchedTextRaw);
+  if (ratio >= 1 || (lineLength > 0 && ratio >= VOICE_AUTO_MATCH_THRESHOLD)) {
+    voiceAutoState.matchedCharCount = lineLength;
+    voice_auto_complete_current_line();
+  }
+}
+
+function voice_auto_complete_current_line() {
+  if (!voiceAutoState.shouldListen) {
+    return;
+  }
+  const lineElement = voiceAutoState.currentLineElement;
+  if (lineElement && lineElement.length) {
+    set_karaoke_progress(lineElement, 1);
+    lineElement.removeClass("karaoke-active").addClass("karaoke-armed karaoke-complete");
+  }
+  voice_auto_reset_transcript();
+  voiceAutoState.currentLineElement = null;
+  voiceAutoState.currentLineNormalized = "";
+  voiceAutoState.currentLineLength = 0;
+  if (!autoProgressEnabled || !prayerSequence.length) {
+    return;
+  }
+  if (lineByLineEnabled) {
+    const step = prayerSequence[prayerSequenceIndex];
+    const lines = step ? get_step_lines(step) : [];
+    if (step && prayerLineIndex < lines.length - 1) {
+      advance_prayer_line();
+      return;
+    }
+  }
+  advance_prayer_step();
+}
+
+function start_voice_auto_listener() {
+  if (!voice_auto_should_listen()) {
+    return;
+  }
+  voiceAutoState.shouldListen = true;
+  if (!voiceAutoState.recognition) {
+    const RecognitionCtor = get_speech_recognition_constructor();
+    if (!RecognitionCtor) {
+      voiceAutoState.supported = false;
+      update_voice_auto_option();
+      return;
+    }
+    try {
+      const recognition = new RecognitionCtor();
+      recognition.lang = "ko-KR";
+      recognition.interimResults = true;
+      recognition.continuous = true;
+      recognition.maxAlternatives = 1;
+      recognition.onstart = voice_auto_handle_start;
+      recognition.onend = voice_auto_handle_end;
+      recognition.onerror = voice_auto_handle_error;
+      recognition.onresult = voice_auto_handle_result;
+      voiceAutoState.recognition = recognition;
+    } catch (error) {
+      console.error("음성 인식 객체를 생성할 수 없습니다.", error);
+      voiceAutoState.supported = false;
+      update_voice_auto_option();
+      return;
+    }
+  }
+  if (voiceAutoState.running) {
+    return;
+  }
+  try {
+    voiceAutoState.recognition.start();
+  } catch (error) {
+    if (error && error.name === "InvalidStateError") {
+      // 이미 실행 중인 경우 무시
+      return;
+    }
+    console.error("음성 인식을 시작할 수 없습니다.", error);
+  }
+}
+
+function stop_voice_auto_listener(options = {}) {
+  const { resetTranscript = true } = options;
+  voiceAutoState.shouldListen = false;
+  if (voiceAutoState.restartTimer) {
+    clearTimeout(voiceAutoState.restartTimer);
+    voiceAutoState.restartTimer = null;
+  }
+  if (voiceAutoState.recognition && voiceAutoState.running) {
+    try {
+      voiceAutoState.recognition.stop();
+    } catch (error) {
+      console.warn("음성 인식을 중지할 수 없습니다.", error);
+    }
+  }
+  voiceAutoState.running = false;
+  if (resetTranscript) {
+    voice_auto_reset_transcript();
+  }
+}
+
+function refresh_voice_auto_listener(options = {}) {
+  const { resetTranscript = true } = options;
+  if (voice_auto_should_listen()) {
+    voice_auto_prepare_current_line({ resetTranscript });
+    start_voice_auto_listener();
+  } else {
+    stop_voice_auto_listener({ resetTranscript });
+  }
+}
+
+function handle_voice_auto_after_render() {
+  refresh_voice_auto_listener({ resetTranscript: false });
+}
+
 function auto_advance_after_tts() {
   if (!autoProgressEnabled || !ttsEnabled) {
     return;
@@ -1546,7 +1989,12 @@ function render_prayer_step() {
     $("#prayerCurrentStepTitle").text("기도문");
     contentElement.append(create_prayer_line_element("묵주 기도를 시작하려면 단수를 선택해 주세요.", "current"));
     prayerLineIndex = 0;
-    handle_tts_after_render();
+    if (voice_auto_should_listen()) {
+      stop_tts({ cancelSpeech: true, resetKaraoke: true });
+    } else {
+      handle_tts_after_render();
+    }
+    handle_voice_auto_after_render();
     render_prayer_navigation_state();
     return;
   }
@@ -1575,7 +2023,12 @@ function render_prayer_step() {
     if(window.rosary)
       window.rosary.highlight_rosary_step(step.highlight || 'none');
   }
-  handle_tts_after_render();
+  if (voice_auto_should_listen()) {
+    stop_tts({ cancelSpeech: true, resetKaraoke: false });
+  } else {
+    handle_tts_after_render();
+  }
+  handle_voice_auto_after_render();
   render_prayer_navigation_state();
 }
 
@@ -1675,6 +2128,9 @@ function advance_prayer_line() {
   const lines = get_step_lines(step);
   if (prayerLineIndex < lines.length - 1) {
     prayerLineIndex += 1;
+    if (voiceAutoState.shouldListen) {
+      voice_auto_reset_transcript();
+    }
     render_prayer_step();
   }
 }
@@ -1688,6 +2144,9 @@ function retreat_prayer_line() {
   }
   if (prayerLineIndex > 0) {
     prayerLineIndex -= 1;
+    if (voiceAutoState.shouldListen) {
+      voice_auto_reset_transcript();
+    }
     render_prayer_step();
   }
 }
@@ -1699,6 +2158,9 @@ function advance_prayer_step() {
   if (prayerSequenceIndex < prayerSequence.length - 1) {
     prayerSequenceIndex += 1;
     prayerLineIndex = 0;
+    if (voiceAutoState.shouldListen) {
+      voice_auto_reset_transcript();
+    }
     render_prayer_step();
   }
 }
@@ -1710,6 +2172,9 @@ function retreat_prayer_step() {
   if (prayerSequenceIndex > 0) {
     prayerSequenceIndex -= 1;
     prayerLineIndex = 0;
+    if (voiceAutoState.shouldListen) {
+      voice_auto_reset_transcript();
+    }
     render_prayer_step();
   }
 }
@@ -1798,9 +2263,11 @@ function update_voice_auto_option() {
     return;
   }
   const enableVoiceAuto = autoProgressCheckbox.is(":checked");
-  voiceAutoCheckbox.prop("disabled", !enableVoiceAuto);
+  const supported = voice_auto_is_supported();
+  const shouldEnableControl = enableVoiceAuto && supported;
+  voiceAutoCheckbox.prop("disabled", !shouldEnableControl);
   if (enableVoiceAuto) {
-    voiceAutoCheckbox.prop("checked", voiceAutoPreference);
+    voiceAutoCheckbox.prop("checked", shouldEnableControl ? voiceAutoPreference : false);
   } else {
     voiceAutoCheckbox.prop("checked", false);
   }
@@ -2014,12 +2481,18 @@ function enter_prayer_view() {
   }
   window.rosary = rosaryCanvasAPI.create(document.getElementById('rosary-canvas'));
   window.rosary.reset();
-  handle_tts_after_render();
+  if (!voice_auto_should_listen()) {
+    handle_tts_after_render();
+  } else {
+    stop_tts({ cancelSpeech: true, resetKaraoke: false });
+  }
+  refresh_voice_auto_listener({ resetTranscript: true });
 
 }
 
 function exit_prayer_view() {
   stop_tts({ cancelSpeech: true, resetKaraoke: true });
+  stop_voice_auto_listener({ resetTranscript: true });
   prayerSequence = [];
   prayerSequenceIndex = 0;
   prayerLineIndex = 0;
@@ -2055,10 +2528,12 @@ $(document).ready(function() {
     writeSetting("option.autoProgress", enabled);
     update_voice_auto_option();
     autoProgressEnabled = enabled;
+    refresh_voice_auto_listener({ resetTranscript: true });
   });
   $("#plannerOptionVoiceAuto").on("change", function() {
     voiceAutoPreference = $(this).is(":checked");
     writeSetting("option.voiceAuto", voiceAutoPreference);
+    refresh_voice_auto_listener({ resetTranscript: true });
   });
   init_option_collapse_icon();
   $("#plannerOptionFullscreen").on("change", function() {
