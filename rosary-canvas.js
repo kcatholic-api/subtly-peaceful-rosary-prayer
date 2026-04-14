@@ -35,6 +35,10 @@
     HIGHLIGHT_GLOW_OUTER: 'rgba(196,138,45,0.05)',
     HIGHLIGHT_RING: 'rgba(255,232,173,0.85)',
     HIGHLIGHT_PULSE_RATE: 2.4,
+    BACKGROUND_IMAGE_SRC: 'st-francis-with-sultan.png',
+    BACKGROUND_IMAGE_OPACITY: 0.2,
+    BACKGROUND_IMAGE_OFFSET_Y_RATIO: 0.4,
+    BACKGROUND_TITLE_TEXT: 'AKCCME\n중동 한인 가톨릭\n공동체 연합회',
     CROSS_STROKE: '#7f4e24',
     CROSS_GRAD_TOP: '#f2d4a9',
     CROSS_GRAD_BOTTOM: '#b67f3c',
@@ -103,6 +107,8 @@
     let nodes=[], links=[]; let dragging=null; let pointer={x:0,y:0};
     let highlightedId=null; let last=performance.now(); let animTime=0;
     let bgRadiusPx = 0;
+    let backgroundImage = null;
+    let backgroundImageReady = false;
     const VIEW_MIN_SCALE = 1;
     const VIEW_MAX_SCALE = 2.5;
     let viewScale = VIEW_MIN_SCALE;
@@ -125,6 +131,65 @@
       grad.addColorStop(0.5, tone.mid);
       grad.addColorStop(1, tone.dark);
       return grad;
+    }
+
+    function shouldShowBackgroundImage(){
+      return typeof window !== 'undefined' && window.location.hash === '#akccme';
+    }
+
+    function loadBackgroundImage(){
+      if (!CFG.BACKGROUND_IMAGE_SRC || backgroundImage) {
+        return;
+      }
+      const img = new Image();
+      img.onload = () => {
+        backgroundImageReady = true;
+      };
+      img.onerror = () => {
+        backgroundImageReady = false;
+      };
+      img.src = CFG.BACKGROUND_IMAGE_SRC;
+      backgroundImage = img;
+    }
+
+    function drawCoverImage(img, x, y, width, height, offsetYRatio=0){
+      const iw = img.naturalWidth || img.width;
+      const ih = img.naturalHeight || img.height;
+      if (!iw || !ih || !width || !height) {
+        return;
+      }
+      const scale = Math.max(width / iw, height / ih);
+      const drawWidth = iw * scale;
+      const drawHeight = ih * scale;
+      const drawX = x + (width - drawWidth) * 0.5;
+      const drawY = y + (height - drawHeight) * 0.5 + height * offsetYRatio;
+      ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+    }
+
+    function drawBackgroundTitle(){
+      const text = CFG.BACKGROUND_TITLE_TEXT;
+      if (!text) {
+        return;
+      }
+      const lines = String(text).split('\n');
+      const fontSize = Math.max(8, Math.min(12, Math.min(W, H) * 0.07));
+      const lineHeight = fontSize * 1.35;
+      const centerX = W * 0.85;
+      const centerY = H * 0.94;
+      const firstLineY = centerY - ((lines.length - 1) * lineHeight) * 0.5;
+
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `700 ${fontSize}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+      ctx.fillStyle = 'rgba(255, 243, 218, 0.92)';
+      ctx.shadowColor = 'rgba(31, 11, 11, 0.7)';
+      ctx.shadowBlur = Math.max(6, fontSize * 0.35);
+      ctx.shadowOffsetY = Math.max(1, fontSize * 0.08);
+      lines.forEach((line, index) => {
+        ctx.fillText(line, centerX, firstLineY + index * lineHeight);
+      });
+      ctx.restore();
     }
 
     function beadFill(node, isHighlighted){
@@ -382,15 +447,30 @@
       roundedRectPath(ctx, 0, 0, W, H, bgRadiusPx);
       ctx.clip();
 
-      ctx.save();
-      ctx.scale(viewScale, viewScale);
-      ctx.translate(-viewOffset.x, -viewOffset.y);
-
       const bg = ctx.createRadialGradient(W*0.5, H*0.35, Math.max(W,H)*0.05, W*0.5, H*0.4, Math.max(W,H)*0.8);
       bg.addColorStop(0, CFG.COLOR_BG_INNER);
       bg.addColorStop(1, CFG.COLOR_BG_OUTER);
       ctx.fillStyle = bg;
       ctx.fillRect(0, 0, W, H);
+
+      if (shouldShowBackgroundImage()) {
+        loadBackgroundImage();
+      }
+
+      if (shouldShowBackgroundImage() && backgroundImageReady && backgroundImage) {
+        ctx.save();
+        ctx.globalAlpha = CFG.BACKGROUND_IMAGE_OPACITY;
+        drawCoverImage(backgroundImage, 0, 0, W, H, CFG.BACKGROUND_IMAGE_OFFSET_Y_RATIO);
+        ctx.restore();
+      }
+
+      if (shouldShowBackgroundImage()) {
+        drawBackgroundTitle();
+      }
+
+      ctx.save();
+      ctx.scale(viewScale, viewScale);
+      ctx.translate(-viewOffset.x, -viewOffset.y);
 
       ctx.lineWidth=3; ctx.strokeStyle=CFG.COLOR_STRING; ctx.beginPath();
       const loop=collectLoop(); const medal=nodes[54];
@@ -448,6 +528,9 @@
 
     // 공개 API --------------------------------------------------------------
     function init(){
+      if (shouldShowBackgroundImage()) {
+        loadBackgroundImage();
+      }
       resize();
       initRosary();
       animTime = 0;
