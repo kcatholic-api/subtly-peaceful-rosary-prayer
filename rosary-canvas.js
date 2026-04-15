@@ -149,6 +149,13 @@
       return '';
     }
 
+    function getIntentionText(){
+      if (typeof window === 'undefined') {
+        return '';
+      }
+      return new URLSearchParams(window.location.search).get('intention') || '';
+    }
+
     function loadBackgroundImage(){
       if (!CFG.BACKGROUND_IMAGE_SRC || backgroundImage) {
         return;
@@ -377,7 +384,7 @@
       nodes=[]; links=[];
       resetView();
       const CX = W/2;
-      const CY = H*0.375;
+      const CY = H*(getIntentionText() ? 0.425 : 0.375);
       const R = Math.min(W, H) * 0.35; // 기본 구조는 비율 기반, 절대치(구슬/십자가)는 CFG 스케일 사용
 
       // 루프 정의(54개)
@@ -470,7 +477,8 @@
       if (backgroundImageReady && backgroundImage) {
         ctx.save();
         ctx.globalAlpha = CFG.BACKGROUND_IMAGE_OPACITY;
-        drawCoverImage(backgroundImage, 0, 0, W, H, CFG.BACKGROUND_IMAGE_OFFSET_Y_RATIO);
+        const imageOffsetY = CFG.BACKGROUND_IMAGE_OFFSET_Y_RATIO + (getIntentionText() ? 0.05 : 0);
+        drawCoverImage(backgroundImage, 0, 0, W, H, imageOffsetY);
         ctx.restore();
       }
 

@@ -37,6 +37,12 @@
       .prayer-pane-top .prayer-metadata .text-muted {
         color: rgba(241, 237, 231, 0.8) !important;
       }
+      .prayer-intention {
+        color: rgba(255, 246, 226, 0.92);
+        max-width: min(24rem, calc(100vw - 4rem));
+        text-shadow: 0 2px 8px rgba(31, 11, 11, 0.72);
+        white-space: pre-line;
+      }
       .prayer-pane-bottom {
         grid-area: pane;
       }
@@ -479,6 +485,7 @@
             <h3 class="fw-bold mb-0 text-muted" id="prayerCurrentMystery">환의의 신비</h3>
             <div class="fw-semibold fs-5 text-muted" id="prayerCurrentDecade">1단</div>
           </div>
+          <div class="fw-semibold fs-6 mt-1 prayer-intention d-none" id="prayerIntentionText"></div>
         </div>
       </div>
       <div class="prayer-pane-bottom">
@@ -537,6 +544,22 @@ function never_see_startup() {
 }
 
 function load_record() {
+}
+
+function get_prayer_intention_text() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  return new URLSearchParams(window.location.search).get("intention") || "";
+}
+
+function render_prayer_intention() {
+  const intentionElement = $("#prayerIntentionText");
+  if (!intentionElement.length) {
+    return;
+  }
+  const intentionText = get_prayer_intention_text();
+  intentionElement.toggleClass("d-none", !intentionText).text(intentionText);
 }
 
 const plannerMysteryControls = [
@@ -1986,6 +2009,7 @@ function show_tts_support_warning() {
 
 function render_prayer_step() {
   const contentElement = $("#prayerCurrentStepContent");
+  render_prayer_intention();
   if (!contentElement.length) {
     render_prayer_navigation_state();
     return;
