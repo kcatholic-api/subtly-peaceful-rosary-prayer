@@ -134,8 +134,19 @@
       return grad;
     }
 
-    function shouldShowBackgroundImage(){
-      return typeof window !== 'undefined' && window.location.hash === '#akccme';
+    function getBackgroundTitleText(){
+      if (typeof window === 'undefined') {
+        return '';
+      }
+      const params = new URLSearchParams(window.location.search);
+      const customTitle = params.get('name') || params.get('church');
+      if (customTitle) {
+        return customTitle;
+      }
+      if (params.get('theme') === 'akccme') {
+        return CFG.BACKGROUND_TITLE_TEXT;
+      }
+      return '';
     }
 
     function loadBackgroundImage(){
@@ -167,8 +178,7 @@
       ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
     }
 
-    function drawBackgroundTitle(){
-      const text = CFG.BACKGROUND_TITLE_TEXT;
+    function drawBackgroundTitle(text){
       if (!text) {
         return;
       }
@@ -455,20 +465,16 @@
       ctx.fillStyle = bg;
       ctx.fillRect(0, 0, W, H);
 
-      if (shouldShowBackgroundImage()) {
-        loadBackgroundImage();
-      }
+      loadBackgroundImage();
 
-      if (shouldShowBackgroundImage() && backgroundImageReady && backgroundImage) {
+      if (backgroundImageReady && backgroundImage) {
         ctx.save();
         ctx.globalAlpha = CFG.BACKGROUND_IMAGE_OPACITY;
         drawCoverImage(backgroundImage, 0, 0, W, H, CFG.BACKGROUND_IMAGE_OFFSET_Y_RATIO);
         ctx.restore();
       }
 
-      if (shouldShowBackgroundImage()) {
-        drawBackgroundTitle();
-      }
+      drawBackgroundTitle(getBackgroundTitleText());
 
       ctx.save();
       ctx.scale(viewScale, viewScale);
@@ -530,9 +536,7 @@
 
     // 공개 API --------------------------------------------------------------
     function init(){
-      if (shouldShowBackgroundImage()) {
-        loadBackgroundImage();
-      }
+      loadBackgroundImage();
       resize();
       initRosary();
       animTime = 0;
