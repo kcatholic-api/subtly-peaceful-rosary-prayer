@@ -153,6 +153,9 @@
       if (typeof window === 'undefined') {
         return '';
       }
+      if (window.prayerIntentionText) {
+        return window.prayerIntentionText;
+      }
       return new URLSearchParams(window.location.search).get('intention') || '';
     }
 

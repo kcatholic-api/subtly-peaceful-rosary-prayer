@@ -43,6 +43,9 @@
         text-shadow: 0 2px 8px rgba(31, 11, 11, 0.72);
         white-space: pre-line;
       }
+      .prayer-overlay-active .planner-only-option {
+        display: none !important;
+      }
       .prayer-pane-bottom {
         grid-area: pane;
       }
@@ -449,7 +452,7 @@
                   <div class="form-check form-switch mt-2">
                     <input class="form-check-input" type="checkbox" role="switch" id="plannerOptionVoiceAuto" disabled>
                     <label class="form-check-label d-flex align-items-center" for="plannerOptionVoiceAuto">
-                      음성 인식으로 자동 진행 하기
+                      음성 인식으로 자동 진행
                       <span class="badge bg-secondary ms-2">실험 기능</span>
                     </label>
                   </div>
@@ -460,6 +463,10 @@
                   <div id="prayerViewOptions" class="d-none">
                     <hr/>
                     <button type="button" class="btn btn-sm btn-secondary" id="rosaryLayoutResetButton">묵주 레이아웃 초기화</button>
+                  </div>
+                  <div class="mb-3 planner-only-option mt-3">
+                      <label class="form-label fw-semibold" for="plannerIntentionText">기도 지향</label>
+                      <textarea class="form-control" id="plannerIntentionText" rows="2" placeholder="세계 평화를 위해 기도합니다."></textarea>
                   </div>
                 </div>
               </div>
@@ -546,11 +553,24 @@ function never_see_startup() {
 function load_record() {
 }
 
-function get_prayer_intention_text() {
+function normalize_intention_text(text) {
+  return String(text || "").replace(/\\n/g, "\n").trim();
+}
+
+function get_url_intention_text() {
   if (typeof window === "undefined") {
     return "";
   }
-  return new URLSearchParams(window.location.search).get("intention") || "";
+  const intentionText = new URLSearchParams(window.location.search).get("intention") || "";
+  return normalize_intention_text(intentionText);
+}
+
+function read_planner_intention_text() {
+  return normalize_intention_text($("#plannerIntentionText").val() || "");
+}
+
+function get_prayer_intention_text() {
+  return prayerIntentionText || get_url_intention_text();
 }
 
 function render_prayer_intention() {
@@ -580,6 +600,7 @@ let prayerStepIdCounter = 0;
 let rosaryLayoutRefreshHandle = null;
 let autoProgressEnabled = false;
 let autoProgressTimeoutHandle = null;
+let prayerIntentionText = "";
 const AUTO_PROGRESS_LINE_DELAY_MS = 0;
 const AUTO_PROGRESS_STEP_DELAY_MS = 100;
 const HORIZONTAL_SPLIT_ASPECT_THRESHOLD = 16 / 10;
@@ -2491,6 +2512,10 @@ function move_options_to_planner() {
 
 function enter_prayer_view() {
 
+  prayerIntentionText = read_planner_intention_text() || get_url_intention_text();
+  if (typeof window !== "undefined") {
+    window.prayerIntentionText = prayerIntentionText;
+  }
   prayerSequence = build_prayer_sequence();
   prayerSequenceIndex = 0;
   prayerLineIndex = 0;
