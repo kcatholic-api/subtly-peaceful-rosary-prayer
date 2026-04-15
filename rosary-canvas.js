@@ -377,8 +377,9 @@
         if(d<4){ loopKinds.push(TYPE.PATER); loopIds.push(`pater-${d}`); }
       }
       const loop=[]; const t0=Math.PI/2;
+      const direction = -1; // 1 left, -1 right
       for(let i=0;i<loopKinds.length;i++){
-        const t=t0 + (i/loopKinds.length)*Math.PI*2; const x=CX+Math.cos(t)*R; const y=CY+Math.sin(t)*R;
+        const t=t0 + direction*(i/loopKinds.length)*Math.PI*2; const x=CX+Math.cos(t)*R; const y=CY+Math.sin(t)*R;
         const n = new Node(x,y, loopKinds[i], loopIds[i], radiusOverrides()); loop.push(n); nodes.push(n);
       }
       for(let i=0;i<loop.length-1;i++){
